@@ -5,6 +5,7 @@
   "core_version": ">=3.0.1",
   "author": "fcll",
   "description": "Android accessibility control over phone-initiated WSS, screenshots and on-demand chat progress.",
+  "repo": "https://github.com/fcll32/kiraai-phone-assistant",
   "tags": [
     "android",
     "accessibility",
