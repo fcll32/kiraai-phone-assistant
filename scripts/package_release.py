@@ -12,13 +12,11 @@ from sync_release import synchronize
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_DIRS = ("phone_control", "android-app", "uni-app", "deploy", "scripts", "third-party", ".github")
-ROOT_FILES = ("README.md", "新手使用说明.md", "DEVELOPMENT.md", "VALIDATION.md", "CHANGELOG.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "CODE-REVIEW.md", "UI-OUTLINE.md", "INTERACTION-SPEC.md", "HANDOFF.md", "PLUGIN-VALIDATION.md", "VOICE-PLAN.md", "manifest.json", "schema.json", "main.py", "requirements.txt")
+ROOT_FILES = ("README.md", "新手使用说明.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "manifest.json", "schema.json", "main.py", "requirements.txt")
 
 
 def source_files():
     files = {name: ROOT / name for name in ROOT_FILES}
-    for note in ROOT.glob("*-改动说明.md"):
-        files[note.name] = note
     for folder in SOURCE_DIRS:
         for path in (ROOT / folder).rglob("*"):
             relative = path.relative_to(ROOT)
@@ -50,11 +48,6 @@ def package(apk=None, export=None):
     guide = output / "新手使用说明.md"
     shutil.copy2(ROOT / "新手使用说明.md", guide)
     artifacts = [plugin, source, guide]
-    change_note = ROOT / f"{version}-改动说明.md"
-    if change_note.is_file():
-        note = output / change_note.name
-        shutil.copy2(change_note, note)
-        artifacts.append(note)
     if apk:
         apk = Path(apk).resolve()
         with zipfile.ZipFile(apk) as archive:
@@ -70,8 +63,8 @@ def package(apk=None, export=None):
                 raise ValueError("Archive verification failed")
     (output / "README.txt").write_text(
         f"{release['name']} {version}\n\n"
-        f"手机：安装 KiraAI-Phone-Assistant-{version}.apk。本版 versionCode 为 {release['version_code']}；已安装 1.1.9/code 11 的手机不能覆盖降级，需先保存连接信息、卸载旧 App，再安装并重填。\n"
-        f"历史 1.3.x 用户：先尝试同签名覆盖安装。若系统拒绝，请先保存连接信息再处理；卸载会清除手机设置。\n"
+        f"手机：安装 KiraAI-Phone-Assistant-{version}.apk。\n"
+        "如提示版本过低或签名不一致，请先保存连接信息，再卸载旧 App、安装并重新填写；卸载会清除手机设置。\n"
         f"KiraAI：上传 phone_control-{version}.zip，安装并启用。插件 ZIP 不含 APK，手机安装包单独提供。\n"
         "第一次使用：安装插件 ZIP 后，打开 KiraAI 左侧的“手机连接”页面，填公网 IP 和允许使用的聊天。\n"
         "点击“保存并启动”后开始监听，以后重启自动恢复；密码和校验码在管理页复制；手机单独安装同目录的 APK，无需下载源码或运行服务器脚本。\n"

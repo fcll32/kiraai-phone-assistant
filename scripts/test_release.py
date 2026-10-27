@@ -64,7 +64,6 @@ def test_source_distribution_excludes_builds_and_secrets():
     assert "schema.json" in files
     assert "main.py" in files
     assert "新手使用说明.md" in files
-    assert "DEVELOPMENT.md" in files
     assert "phone_control/protocol.py" in files
     assert "phone_control/web/index.html" in files
     assert "uni-app/pages/index/index.uvue" in files
