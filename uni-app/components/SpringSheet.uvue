@@ -1,0 +1,56 @@
+<template>
+  <view v-if="mounted" class="sheet-layer">
+    <view class="sheet-shade" :style="{ opacity: Math.max(0, Math.min(1, progress)) * 0.5 }" @click="dismiss" />
+    <view class="spring-sheet" :style="{ height: height + 'px', transform: 'translateY(' + ((1 - progress) * height) + 'px)', paddingBottom: (inset + 20) + 'px' }">
+      <view class="sheet-grip" role="button" :aria-label="'关闭' + title" @click="dismiss" @touchstart.stop="start" @touchmove.stop.prevent="move" @touchend.stop="end" @touchcancel.stop="cancel">
+        <view class="grip-line" /><text class="grip-title">{{ title }}</text><text class="grip-note">{{ note }}</text>
+      </view>
+      <slot />
+    </view>
+  </view>
+</template>
+<script setup>
+import { ref, watch, onUnmounted } from 'vue'
+const props = defineProps({ title: { type: String, default: '动画速度' }, note: { type: String, default: '拖动顶部可收起 · 轻滑滚轮选择' }, open: { type: Boolean, default: false }, duration: { type: Number, default: 400 }, inset: { type: Number, default: 12 }, height: { type: Number, default: 440 } })
+const emit = defineEmits(['close', 'progress', 'motion'])
+const mounted = ref(false), progress = ref(0)
+let timer = null, y = 0, origin = 0, last = 0, at = 0, velocity = 0, dragging = false, moved = false
+function stop() { if (timer != null) clearInterval(timer); timer = null }
+function publish(value, notify = false) { progress.value = value; if (notify) emit('progress', Math.max(0, Math.min(1, value))) }
+function animate(target) {
+  stop(); dragging = false
+  const from = progress.value, started = Date.now()
+  if (target === 0 && !mounted.value) return
+  emit('motion', props.duration); emit('progress', target)
+  if (target === 1) mounted.value = true
+  function finish() { stop(); publish(target); if (target === 0) mounted.value = false }
+  if (props.duration === 0) { finish(); return }
+  timer = setInterval(() => {
+    const p = Math.min(1, (Date.now() - started) / props.duration)
+    publish(target + (from - target) * Math.exp(-7 * p) * Math.cos(5 * p))
+    if (p === 1) finish()
+  }, 16)
+}
+watch(() => [props.open, props.duration], () => animate(props.open ? 1 : 0), { immediate: true })
+function dismiss() { if (moved) { moved = false; return }; emit('close') }
+function start(e) { stop(); emit('motion', 0); publish(progress.value, true); dragging = true; moved = false; y = e.touches[0].clientY; last = y; origin = progress.value; at = Date.now(); velocity = 0 }
+function move(e) {
+  if (!dragging) return
+  const next = e.touches[0].clientY, dy = next - y, now = Date.now()
+  if (Math.abs(dy) > 5) moved = true
+  velocity = (next - last) / Math.max(8, now - at); last = next; at = now
+  publish(Math.min(1.12, origin - (dy < 0 ? dy * 0.18 : dy) / props.height), true)
+}
+function end() { if (!dragging) return; dragging = false; if (Date.now() - at > 90) velocity = 0; if (progress.value < 2 / 3 || velocity > 0.65) emit('close'); else animate(1) }
+function cancel() { dragging = false; moved = true; animate(props.open ? 1 : 0) }
+onUnmounted(() => { stop(); emit('motion', 0); emit('progress', 0) })
+</script>
+<style>
+.sheet-layer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 43; }
+.sheet-shade { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #020811; }
+.spring-sheet { position: absolute; bottom: 0; left: 0; right: 0; background-color: #f7faff; border-radius: 28px 28px 0 0; padding: 0 22px 24px; }
+.sheet-grip { align-items: center; padding: 12px 0 16px; }
+.grip-line { width: 36px; height: 4px; border-radius: 3px; background-color: #bdc9d8; margin-bottom: 18px; }
+.grip-title { font-size: 21px; font-weight: 600; color: #153657; }
+.grip-note { font-size: 12px; color: #5e7086; margin-top: 8px; }
+</style>

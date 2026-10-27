@@ -1,0 +1,254 @@
+{
+  "transport": {
+    "name": "Connection mode",
+    "type": "string",
+    "default": "app",
+    "options": [
+      "app",
+      "adb"
+    ],
+    "hint": "app uses a phone-initiated WebSocket. adb is an optional legacy mode.",
+    "locales": {
+      "zh": {
+        "name": "连接方式",
+        "hint": "使用手机 App 时保持 app，不用修改。adb 是另一种连接方法，新手可以忽略。"
+      }
+    }
+  },
+  "public_ip": {
+    "name": "Public IP of the server running KiraAI",
+    "type": "string",
+    "default": "",
+    "hint": "Enter the public IP of the machine running KiraAI, not the phone's IP. IP only; enter the port below. The plugin uses it to prepare the connection address and server certificate. On the phone, enter this same IP plus the port. The phone initiates the connection.",
+    "locales": {
+      "zh": {
+        "name": "运行 KiraAI 的服务器公网 IP",
+        "hint": "填安装 KiraAI 的那台服务器的公网 IP，可在云服务器控制台查看；不是手机的 IP。这里只填 IP，端口填下一项。插件用它生成手机连接地址和让手机识别服务器的安全凭证。手机里再填同一个 IP 加端口；始终由手机主动连接服务器。也可到左侧“手机连接”页一步步填写。"
+      }
+    }
+  },
+  "phone_port": {
+    "name": "Phone connection port",
+    "type": "integer",
+    "default": 8443,
+    "hint": "The server port used by this plugin, usually 8443; not KiraAI's management web port. The phone address is the public IP above followed by : and this port. Allow it in the server firewall and map the same port in Docker.",
+    "locales": {
+      "zh": {
+        "name": "手机连接端口",
+        "hint": "这是插件在服务器上接收手机连接的端口，通常保持 8443，不是 KiraAI 管理网页的端口。手机地址填“上面的公网 IP:这个端口”。服务器安全组需放行；Docker 安装还需映射同一端口。"
+      }
+    }
+  },
+  "builtin_server": {
+    "name": "Built-in phone server",
+    "type": "boolean",
+    "default": true,
+    "hint": "Automatically create TLS credentials and serve phone connections. Disable to keep using an external proxy.",
+    "locales": {
+      "zh": {
+        "name": "内置手机连接服务",
+        "hint": "新用户保持开启，无需额外安装服务器软件。已经用旧版 Nginx 连接成功的用户可关闭此项，继续使用旧地址。"
+      }
+    }
+  },
+  "device_token": {
+    "name": "Phone connection password",
+    "type": "sensitive",
+    "default": "",
+    "hint": "Optional 8–128 printable ASCII characters, without spaces. Empty uses the saved generated password.",
+    "locales": {
+      "zh": {
+        "name": "自定义连接密码（可选）",
+        "hint": "可以自定义 8–128 位英文字母、数字或符号，不含空格。留空使用自动生成的密码；旧密码继续有效。管理页修改密码后，手机也要同步修改。"
+      }
+    }
+  },
+  "app_device_id": {
+    "name": "Allowed app device ID",
+    "type": "string",
+    "default": "",
+    "hint": "Optional device ID displayed by the Android app. Only one phone can connect at a time.",
+    "locales": {
+      "zh": {
+        "name": "只允许这台手机（可选）",
+        "hint": "第一次使用可以留空。想固定一台手机时，到 App 的连接设置页复制设备 ID，再粘贴到这里。"
+      }
+    }
+  },
+  "voice_enabled": {
+    "name": "App voice calls",
+    "type": "boolean",
+    "default": false,
+    "hint": "Enable calls from your paired phone. Uses Kira's default STT, LLM and TTS, with a separate phone session and access only to this plugin's phone tools.",
+    "locales": {
+      "zh": {
+        "name": "App 内通话",
+        "hint": "开启后，配对手机可与 AI 语音通话并请求操作本机。先在 KiraAI 设置默认语音识别、聊天和语音合成模型。通话使用独立记忆，不借用其他聊天身份；每次说话最长 30 秒。"
+      }
+    }
+  },
+  "allowed_sessions": {
+    "name": "Allowed sessions",
+    "type": "list",
+    "default": [],
+    "hint": "Only listed sessions can control or view the phone. Empty denies all sessions.",
+    "locales": {
+      "zh": {
+        "name": "允许使用的聊天",
+        "hint": "在 KiraAI 的会话管理里找到你和 AI 的聊天，点“复制会话 ID”，再粘贴到这里，一行一个。留空时所有聊天都不能操作手机。"
+      }
+    }
+  },
+  "allowed_users": {
+    "name": "Allowed user IDs",
+    "type": "list",
+    "default": [],
+    "hint": "Optional sender IDs within allowed sessions. Empty allows all members of those sessions.",
+    "locales": {
+      "zh": {
+        "name": "允许使用的人（可选）",
+        "hint": "私聊可以留空。群聊时可填写你的用户 ID，只让指定的人操作手机。留空时，已允许的聊天中所有人都能使用。"
+      }
+    }
+  },
+  "screenshot_max_edge": {
+    "name": "Screenshot maximum edge",
+    "type": "integer",
+    "default": 1280,
+    "hint": "320–2560 pixels; reduces image upload size. Coordinates remain normalized.",
+    "locales": {
+      "zh": {
+        "name": "截图大小",
+        "hint": "先保持 1280。图片太大、发送太慢时可以调小；可填 320–2560。"
+      }
+    }
+  },
+  "screenshot_format": {
+    "name": "Screenshot format (App)",
+    "type": "string",
+    "default": "jpeg",
+    "options": [
+      "jpeg",
+      "png"
+    ],
+    "hint": "JPEG reduces photo/video frame upload size. PNG preserves fine text. Older apps may still return PNG.",
+    "locales": {
+      "zh": {
+        "name": "截图格式（手机 App）",
+        "hint": "默认 jpeg，视频画面传输通常更快。小字不清楚时改成 png；旧版 App 会继续使用 png。"
+      }
+    }
+  },
+  "command_timeout": {
+    "name": "Command timeout",
+    "type": "integer",
+    "default": 15,
+    "hint": "Seconds, 1–60. Covers the request send and response. Timeout disconnects the app; observe before retrying.",
+    "locales": {
+      "zh": {
+        "name": "等待手机回复的时间",
+        "hint": "先保持 15 秒，可填 1–60。超时后先看看手机是否已完成动作，再决定要不要重试。"
+      }
+    }
+  },
+  "action_delay": {
+    "name": "Delay before observing action result",
+    "type": "float",
+    "default": 0.25,
+    "hint": "Seconds, 0–3. For slower pages the AI can explicitly wait and observe again.",
+    "locales": {
+      "zh": {
+        "name": "操作后等待多久再看屏幕",
+        "hint": "新安装默认 0.25 秒，可填 0–3。页面打开比较慢时适当加长；升级不会覆盖已保存的值。"
+      }
+    }
+  },
+  "adb_path": {
+    "name": "ADB executable (ADB only)",
+    "type": "string",
+    "default": "adb",
+    "hint": "Executable path only, without command arguments.",
+    "locales": {
+      "zh": {
+        "name": "ADB 程序路径（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。PATH 中有 adb 时保留 adb，否则填完整路径，例如 /usr/bin/adb 或 C:\\platform-tools\\adb.exe；不含参数。"
+      }
+    }
+  },
+  "device_serial": {
+    "name": "Device serial (ADB only)",
+    "type": "string",
+    "default": "",
+    "hint": "Exact serial from adb devices -l. Required if multiple devices are online.",
+    "locales": {
+      "zh": {
+        "name": "设备序列号（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。填写 adb devices -l 第一列。留空只允许恰好一台在线设备；多台设备必须指定。"
+      }
+    }
+  },
+  "connect_address": {
+    "name": "Wireless device address (ADB only)",
+    "type": "string",
+    "default": "",
+    "hint": "Optional host:port passed to adb connect; not the ADB server address.",
+    "locales": {
+      "zh": {
+        "name": "无线手机连接地址（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。可选，填写手机无线调试的 IP:连接端口；USB 连接或已配对的远端 ADB 服务通常留空。这里不是 ADB 服务端口，也不是无线配对端口。"
+      }
+    }
+  },
+  "adb_server_host": {
+    "name": "ADB server host (ADB only)",
+    "type": "string",
+    "default": "",
+    "hint": "Optional remote ADB server host (-H). Prefer an SSH tunnel or a private VPN.",
+    "locales": {
+      "zh": {
+        "name": "ADB 服务主机（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。留空使用本机服务；服务器转接手机时可填 SSH 隧道的 127.0.0.1 或 VPN 内的 ADB 服务主机。不要向公网暴露 ADB。"
+      }
+    }
+  },
+  "adb_server_port": {
+    "name": "ADB server port (ADB only)",
+    "type": "integer",
+    "default": 5037,
+    "hint": "ADB server port (-P), 1–65535.",
+    "locales": {
+      "zh": {
+        "name": "ADB 服务端口（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。本机一般为 5037；SSH 反向隧道示例为 15037。它与手机无线调试端口不同。"
+      }
+    }
+  },
+  "text_input_mode": {
+    "name": "Text input mode (ADB only)",
+    "type": "string",
+    "default": "adb",
+    "options": [
+      "adb",
+      "adb_keyboard"
+    ],
+    "hint": "adb: ASCII only. adb_keyboard: Unicode through an installed and selected ADB Keyboard.",
+    "locales": {
+      "zh": {
+        "name": "文字输入模式（仅 ADB）",
+        "hint": "使用手机 App 时不用修改。adb 支持英文数字；adb_keyboard 支持中文，需要先在手机安装并切换至 ADB Keyboard。插件不自动安装或切换输入法。"
+      }
+    }
+  },
+  "listener_enabled": {
+    "name": "Start phone listener on reload",
+    "type": "boolean",
+    "default": false,
+    "hint": "Start once on the Phone connection page to listen and restore on restart. Stop disables restoration.",
+    "locales": {
+      "zh": {
+        "name": "手机服务启动状态",
+        "hint": "首次请到“手机连接”页点启动。启动后重启自动恢复；手动停止后不再恢复。只保存 IP 和端口不会首次启动。"
+      }
+    }
+  }
+}

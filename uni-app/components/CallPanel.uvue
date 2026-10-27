@@ -1,0 +1,109 @@
+<template>
+  <view>
+    <text class="call-kicker">语音陪伴</text>
+    <text class="call-headline">和 AI 聊一会儿</text>
+    <text class="call-lede">用你的声音，接通自己的 Kira。</text>
+    <view class="call-card">
+      <view class="call-top"><text class="call-tag">APP 内通话</text><text class="call-tag">{{ voice.active ? '通话中' : '随时开始' }}</text></view>
+      <view class="call-orbit">
+        <view class="call-orbit-ring" :style="orbitStyle" />
+        <view class="call-orb" :class="voice.active ? 'call-orb-on' : ''"><text class="call-monogram">K</text></view>
+      </view>
+      <text class="call-status">{{ statusLabel }}</text>
+      <text class="call-note">{{ voice.detail || '接通后直接说话，停顿后 AI 会回应。' }}</text>
+      <view v-if="voice.active" class="call-meter">
+        <view v-for="n in 15" :key="n" class="call-meter-bar" :style="meterStyle(n)" />
+      </view>
+      <view v-if="!voice.active" class="call-primary">
+        <FeedbackButton :label="voice.microphoneGranted ? '开始通话' : '允许麦克风'" :animated="animated" :speed="speed" :active="visible" @press="emit('start')" />
+      </view>
+      <view v-else class="call-controls">
+        <view class="call-control" :class="voice.muted ? 'call-control-selected' : ''" role="button" @click="emit('mute')"><text class="call-control-symbol">{{ voice.muted ? '×' : '◎' }}</text><text class="call-control-text">{{ voice.muted ? '取消静音' : '静音' }}</text></view>
+        <view class="call-control call-end" role="button" @click="emit('stop')"><text class="call-control-symbol call-end-text">⌁</text><text class="call-control-text call-end-text">挂断</text></view>
+        <view class="call-control" :class="voice.speaker ? 'call-control-selected' : ''" role="button" @click="emit('speaker')"><text class="call-control-symbol">◖</text><text class="call-control-text">{{ voice.speaker ? '扬声器' : '听筒' }}</text></view>
+      </view>
+      <view v-if="canInterrupt" class="call-interrupt" role="button" @click="emit('interrupt')"><text class="call-link">停止这次回复，我来说</text></view>
+    </view>
+    <text class="call-caption">先在服务器的“手机连接”页开启 App 通话，并配置语音识别、聊天和语音合成模型。当前采用轮流说话，回复时暂停收音。</text>
+    <view v-if="voice.transcripts && voice.transcripts.length > 0" class="call-card call-history">
+      <text class="call-section">这次聊了什么</text>
+      <view v-for="(message, index) in voice.transcripts.slice(-8)" :key="index" class="call-message">
+        <text class="call-speaker">{{ message.role === 'user' ? '你' : message.role === 'assistant' ? 'Kira' : '提示' }}</text>
+        <text class="call-message-text">{{ message.text }}</text>
+      </view>
+    </view>
+    <view class="call-card call-lab">
+      <view class="call-lab-heading" role="button" @click="emit('expand-lab')"><view><text class="call-tag">EXPERIMENTAL</text><text class="call-section">虚拟麦克风</text></view><text class="call-link">{{ labOpen ? '收起 −' : '展开 +' }}</text></view>
+      <text class="call-note call-left">先检测这台手机，再尝试把测试音送进应用。</text>
+      <view v-if="labOpen">
+        <view class="call-lab-result"><text class="call-result-label">{{ mic.verified ? '本机录音验证通过' : '兼容性检测' }}</text><text class="call-message-text">{{ mic.detail || '需要 Android 13 及以上，并由你启动和授权 Shizuku。' }}</text><text v-if="mic.verified && mic.latencyMs >= 0" class="call-note call-left">本次本机测量 {{ mic.latencyMs }} ms；不含网络和 QQ／微信通话。</text></view>
+        <view v-if="!mic.authorized" class="call-lab-action" role="button" @click="emit('authorize')"><text class="call-link">连接并授权 Shizuku →</text></view>
+        <view class="call-targets">
+          <view v-for="target in targets" :key="target.id" class="call-target" :class="targetPackage === target.id ? 'call-target-on' : ''" role="radio" :aria-checked="targetPackage === target.id" @click="selectTarget(target.id)"><text class="call-target-label">{{ target.label }}</text></view>
+        </view>
+        <text class="call-note call-left">{{ targetPackage === 'top.kira.phone' ? '本机检测会录制测试音，只有匹配成功才显示通过。' : '测试会向所选应用送入短测试音。请先开启录音或通话；是否听到需人工确认。' }}</text>
+        <view class="call-lab-action" role="button" @click="mic.active ? emit('stop-test') : emit('test', targetPackage)"><text class="call-link">{{ mic.active ? '停止测试' : '开始 5 秒测试 →' }}</text></view>
+        <text class="call-fine">实验入口暂不转发 AI 声音，也不代表 QQ／微信已兼容。App 通话与测试不能同时运行。</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue'
+import FeedbackButton from '@/components/FeedbackButton.uvue'
+import { animationDuration } from '@/lib/interactions.js'
+const props = defineProps({ voice: { type: Object, default: () => ({}) }, mic: { type: Object, default: () => ({}) }, labOpen: { type: Boolean, default: false }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 }, visible: { type: Boolean, default: true } })
+const emit = defineEmits(['start', 'stop', 'mute', 'speaker', 'interrupt', 'authorize', 'test', 'stop-test', 'expand-lab'])
+const targetPackage = ref('top.kira.phone')
+const targets = [{ id: 'top.kira.phone', label: '本机检测' }, { id: 'com.tencent.mobileqq', label: 'QQ' }, { id: 'com.tencent.mm', label: '微信' }]
+const labels = { idle: '准备好了吗', connecting: '正在接通', listening: '我在听', recording: '正在听你说', thinking: '想一想，马上回应', synthesizing: '正在准备声音', playing: 'Kira 正在说', error: '暂时没有接通', stopped: '通话已结束' }
+const statusLabel = computed(() => props.voice.active && props.voice.muted ? '麦克风已静音' : labels[props.voice.status] || '准备好了吗')
+const canInterrupt = computed(() => props.voice.active && ['thinking', 'synthesizing', 'playing'].includes(props.voice.status))
+const orbitStyle = computed(() => ({ transform: 'scale(' + (props.voice.active ? 1.06 + Math.min(1, Math.max(0, Number(props.voice.level) || 0)) * 0.16 : 1) + ')', opacity: props.voice.active ? 1 : 0.5, transitionDuration: animationDuration(240, props.speed, props.animated) + 'ms' }))
+function meterStyle(n) { const level = props.voice.muted ? 0 : Math.min(1, Math.max(0, Number(props.voice.level) || 0)); return { transform: 'scaleY(' + (0.15 + level * (1 - Math.abs(n - 8) / 10)) + ')', transitionDuration: animationDuration(120, props.speed, props.animated) + 'ms' } }
+function selectTarget(value) { if (!props.mic.active) targetPackage.value = value }
+</script>
+
+<style>
+.call-kicker {color: #698095; font-size: 11px; letter-spacing: 1px; margin-top: 0; }
+.call-headline {font-weight: 600;   color: #233f58; font-size: 25px; line-height: 34px; margin-top: 5px; }
+.call-lede {color: #607588; font-size: 13px; line-height: 21px; margin-top: 6px; margin-bottom: 20px; }
+.call-card {border-radius: 24px;  margin-bottom: 16px;  background-color: #f8fafb; padding: 20px; border: 1px solid #d4e0ea; }
+.call-top { flex-direction: row; justify-content: space-between; }
+.call-tag { color: #6c8099; font-size: 11px; letter-spacing: 1px; }
+.call-orbit {align-items: center; justify-content: center;  height: 136px; }
+.call-orbit-ring { position: absolute; width: 122px; height: 122px; border-radius: 61px; border-width: 1px; border-color: #bcd5ef; border-style: solid; background-color: #f1f6fc; transition-property: transform, opacity; }
+.call-orb { width: 88px; height: 88px; border-radius: 44px; background-color: #e0ecfa; align-items: center; justify-content: center; }
+.call-orb-on {background-color: #c0d6e8; }
+.call-monogram {font-size: 36px; font-weight: 600;   color: #456b90; }
+.call-status { font-size: 18px; font-weight: 600; text-align: center; color: #15283f; }
+.call-note { font-size: 14px; line-height: 21px; color: #627287; text-align: center; margin-top: 10px; }
+.call-primary { margin-top: 24px; }
+.call-controls { flex-direction: row; justify-content: space-between; margin-top: 20px; }
+.call-control { width: 76px; height: 76px; border-radius: 24px; background-color: #f0f4f9; align-items: center; justify-content: center; }
+.call-control-selected { background-color: #dceafb; }
+.call-control-symbol { font-size: 26px; color: #1e63b4; }
+.call-control-text { font-size: 11px; margin-top: 4px; color: #264c7d; }
+.call-end { background-color: #b64855; }
+.call-end-text { color: #ffffff; }
+.call-meter { height: 24px; flex-direction: row; align-items: center; justify-content: center; margin-top: 16px; }
+.call-meter-bar { width: 4px; height: 24px; margin: 0 3px; border-radius: 3px; background-color: #5d96cf; transition-property: transform; }
+.call-caption {margin: 0 4px 24px;  color: #62798d; font-size: 12px; line-height: 20px; }
+.call-interrupt { min-height: 44px; justify-content: center; align-items: center; margin-top: 12px; }
+.call-link { font-size: 14px; color: #1e63b4; }
+.call-section { font-size: 18px; color: #15283f; font-weight: 600; margin-top: 4px; }
+.call-message { margin-top: 16px; padding-top: 16px; border-top-style: solid; border-top-width: 1px; border-top-color: #edf0f5; }
+.call-speaker { font-size: 11px; color: #597fa9; margin-bottom: 8px; }
+.call-message-text { font-size: 14px; line-height: 22px; color: #34465c; }
+.call-lab-heading { min-height: 48px; flex-direction: row; align-items: center; justify-content: space-between; }
+.call-left { text-align: left; }
+.call-lab-result { background-color: #eef4fb; border-radius: 14px; padding: 16px; margin-top: 16px; }
+.call-result-label { font-size: 11px; color: #597fa9; margin-bottom: 8px; }
+.call-lab-action { min-height: 48px; justify-content: center; margin-top: 8px; }
+.call-targets { flex-direction: row; margin-top: 12px; }
+.call-target { min-height: 44px; padding: 0 16px; justify-content: center; border-radius: 14px; background-color: #f0f4f9; margin-right: 8px; }
+.call-target-on { background-color: #dceafb; }
+.call-target-label { font-size: 14px; color: #264c7d; }
+.call-fine { font-size: 11px; line-height: 18px; color: #7d8794; margin-top: 8px; }
+</style>

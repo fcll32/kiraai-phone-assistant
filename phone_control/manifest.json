@@ -1,0 +1,19 @@
+{
+  "plugin_id": "phone_control",
+  "display_name": "KiraAI Phone Assistant",
+  "version": "1.0.0",
+  "core_version": ">=3.0.1",
+  "author": "fcll",
+  "description": "Android accessibility control over phone-initiated WSS, screenshots and on-demand chat progress.",
+  "tags": [
+    "android",
+    "accessibility",
+    "tools"
+  ],
+  "locales": {
+    "zh": {
+      "display_name": "KiraAI 手机助手",
+      "description": "手机 App 主动连接公网服务器，使用无障碍控制手机，按需截图和发送文字进度。"
+    }
+  }
+}

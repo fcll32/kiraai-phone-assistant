@@ -1,0 +1,97 @@
+<template>
+  <view class="connection-hero">
+    <view class="hero-flipper" :style="flipStyle">
+      <view v-show="!back" class="hero-face">
+        <view class="hero-heading"><text class="hero-kicker">手机连接</text><view class="hero-status" :class="connected ? 'hero-online' : ''"><view class="hero-dot" /><text class="hero-status-text">{{ connected ? '已就绪' : running ? '连接中' : '待连接' }}</text></view></view>
+        <view class="hero-main"><view :style="copyStyle" class="hero-message"><text class="hero-title">{{ title }}</text><text class="hero-note">{{ note }}</text></view><view class="hero-visual" aria-hidden="true"><view class="hero-orbit" /><view class="hero-orbit hero-orbit-small" /><view class="hero-phone"><view class="hero-camera" /><text class="hero-ai">AI</text><view class="hero-line" /><view class="hero-line hero-line-short" /></view><view class="hero-signal"><text class="hero-signal-text">{{ connected ? '✓' : '↗' }}</text></view></view></view>
+        <view class="hero-preview"><text class="hero-preview-label">连接到</text><text class="hero-preview-value" :lines="1">{{ address || '你的 Kira 服务器' }}</text></view>
+      </view>
+      <view v-show="back" class="hero-face hero-back">
+        <text class="hero-kicker">连接概览</text><text class="hero-back-title">连接信息</text>
+        <view class="hero-info"><text class="hero-label">服务器</text><text class="hero-value" :lines="1">{{ address || '还没有填写地址' }}</text></view>
+        <view class="hero-info"><text class="hero-label">设备</text><text class="hero-value" :lines="1">{{ device }}</text></view>
+        <view class="hero-checks"><view v-for="(label, i) in ['连接信息', '无障碍', '已连接']" :key="i" class="hero-check"><text class="hero-check-dot" :class="checks[i] ? 'hero-check-done' : ''">{{ checks[i] ? '✓' : '·' }}</text><text class="hero-check-text">{{ label }}</text></view></view>
+        <text class="hero-back-note">由你开启，随时可以停止。</text>
+      </view>
+    </view>
+    <view class="hero-flip-row" role="button" :aria-label="back ? '翻回连接状态' : '翻看连接概览'" :aria-disabled="busy" @click="flip"><text class="hero-flip-label">{{ back ? '返回连接状态' : '翻看连接概览' }}</text><text class="hero-flip-icon">↻</text></view>
+    <view class="hero-bottom"><slot /></view>
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { createTimeoutScope } from '@/lib/timers.js'
+const props = defineProps({ title: { type: String, default: '' }, note: { type: String, default: '' }, address: { type: String, default: '' }, device: { type: String, default: 'Android 手机' }, connected: { type: Boolean, default: false }, running: { type: Boolean, default: false }, checks: { type: Array, default: () => [] }, copyStyle: { type: Object, default: () => ({}) }, duration: { type: Number, default: 480 }, active: { type: Boolean, default: true } })
+const timeouts = createTimeoutScope()
+const back = ref(false), busy = ref(false), angle = ref(0), phaseMs = ref(0), lift = ref(false)
+let target = false
+const flipStyle = computed(() => {
+  let perspective = ''
+  // #ifdef H5
+  perspective = 'perspective(900px) '
+  // #endif
+  return { transform: perspective + 'translateY(' + (lift.value ? -4 : 0) + 'px) rotateY(' + angle.value + 'deg) scale(' + (lift.value ? 1.015 : 1) + ')', transitionDuration: phaseMs.value + 'ms' }
+})
+function finish() { timeouts.clear(); back.value = target; angle.value = 0; lift.value = false; phaseMs.value = 0; busy.value = false }
+function flip() {
+  if (busy.value || !props.active) return
+  target = !back.value
+  if (props.duration === 0) { finish(); return }
+  busy.value = true
+  const half = Math.max(1, Math.round(props.duration / 2)), direction = target ? 1 : -1
+  phaseMs.value = half; angle.value = direction * 90; lift.value = true
+  // Both faces are already mounted. Swap only while edge-on; no frame loop,
+  // shadow interpolation or native view construction during the rotation.
+  timeouts.after(() => {
+    phaseMs.value = 0; back.value = target; angle.value = -direction * 90
+    timeouts.after(() => {
+      phaseMs.value = half; angle.value = 0; lift.value = false
+      timeouts.after(() => { busy.value = false }, half)
+    }, 20)
+  }, half)
+}
+watch(() => [props.active, props.duration], () => { if (!props.active || props.duration === 0) finish() })
+onUnmounted(() => timeouts.dispose())
+</script>
+<style>
+.connection-hero {overflow: hidden; border: 1px solid #d8e6f6;  background-color: #f8fafb; border-color: #d4e0ea; border-radius: 22px; }
+.hero-flipper {transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.32,1);  height: 204px; }
+.hero-face {position: absolute; top: 0; left: 0; right: 0; bottom: 0;   padding: 18px 20px 0; }
+.hero-heading { flex-direction: row; align-items: center; justify-content: space-between; }
+.hero-kicker { font-size: 12px; line-height: 20px; color: #58718e; }
+.hero-status { flex-direction: row; align-items: center; padding: 4px 9px; border-radius: 20px; background-color: #e3edf9; }
+.hero-dot { width: 5px; height: 5px; border-radius: 3px; background-color: #6e90b5; margin-right: 6px; }
+.hero-online { background-color: #dcefe7; }
+.hero-status-text { font-size: 11px; color: #335776; }
+.hero-visual {align-items: center; justify-content: center;  width: 82px; height: 100px; flex-shrink: 0; margin-left: 12px; }
+.hero-orbit {position: absolute;   border: 1px solid #d4e3f5; border-radius: 100px; transform: rotate(-14deg);  width: 92px; height: 52px; border-color: #d5e1eb; }
+.hero-orbit-small {transform: rotate(14deg);  width: 72px; height: 66px; }
+.hero-phone {border: 3px solid #7d9dc4; transform: rotate(-10deg);   width: 52px; height: 82px; border-radius: 14px; padding: 7px 9px; background-color: #527596; border-color: #95acc1; }
+.hero-camera { width: 17px; height: 3px; border-radius: 3px; background-color: #adc8e8; align-self: center; }
+.hero-ai {color: #ffffff; font-weight: 600;   font-size: 21px; line-height: 27px; margin-top: 5px; }
+.hero-line { height: 3px; background-color: #adc8e8; border-radius: 2px; margin-top: 5px; }
+.hero-line-short { width: 20px; }
+.hero-signal {position: absolute;     border: 4px solid #f5f9ff;   align-items: center; justify-content: center; transform: rotate(10deg);  top: 60px; left: 52px; width: 29px; height: 29px; border-width: 3px; border-color: #f8fafb; border-radius: 11px; background-color: #d6e6f3; }
+.hero-signal-text {color: #244d79;  font-weight: 600;  font-size: 16px; }
+.hero-message {transition-property: transform,opacity;  flex: 1; }
+.hero-title {font-weight: 600;   font-size: 21px; line-height: 29px; color: #29465f; }
+.hero-note {font-size: 13px; line-height: 21px; color: #62788b; margin-top: 7px; }
+.hero-back-title {font-weight: 600; color: #183553;    font-size: 21px; line-height: 28px; margin-top: 4px; margin-bottom: 2px; }
+.hero-info {flex-direction: row; align-items: center; margin-top: 8px; }
+.hero-label {font-size: 12px; line-height: 18px;   width: 66px; color: #63798c; }
+.hero-value {color: #284b70; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;  flex: 1; font-size: 14px; line-height: 22px; }
+.hero-checks {flex-direction: row;   margin-top: 12px; }
+.hero-check { flex: 1; flex-direction: row; align-items: center; }
+.hero-check-dot { width: 19px; height: 19px; text-align: center; line-height: 19px; font-size: 12px; color: #65809c; background-color: #e3edf9; border-radius: 10px; margin-right: 5px; }
+.hero-check-done { color: #247356; background-color: #dcefe7; }
+.hero-check-text { color: #59718c; font-size: 12px; }
+.hero-back-note {color: #71869d; font-size: 12px;   margin-top: 12px; }
+.hero-flip-row {min-height: 44px; flex-direction: row; justify-content: space-between; align-items: center;   padding: 0 20px; border-top: 1px solid #e3eaf0; }
+.hero-flip-label { font-size: 12px; color: #587aa2; }
+.hero-flip-icon { font-size: 22px; color: #416c9b; }
+.hero-bottom {padding: 0 18px 18px; }
+.hero-main { flex-direction: row; align-items: center; margin-top: 13px; }
+.hero-preview { flex-direction: row; align-items: center; margin-top: 13px; }
+.hero-preview-label { font-size: 11px; color: #74899a; margin-right: 8px; }
+.hero-preview-value { flex: 1; font-size: 12px; color: #536f87; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+</style>

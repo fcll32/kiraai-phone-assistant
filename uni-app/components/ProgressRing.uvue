@@ -1,0 +1,63 @@
+<template>
+  <view class="ring" :style="{ width: size + 'px', height: size + 'px' }">
+    <view class="ring-track" :style="trackStyle" />
+    <view v-for="(dot, i) in dotCount" :key="i" class="ring-dot" :class="i < litCount ? 'ring-dot-on' : ''" :style="dotStyle(i)" />
+    <view class="ring-core" :style="coreStyle">
+      <view class="digit-window">
+        <view class="digit-strip" :style="{ transform: 'translateY(' + (-roll * 38) + 'px)' }">
+          <text v-for="n in 10" :key="n" class="digit">{{ n - 1 }}</text>
+        </view>
+      </view>
+    </view>
+    <text class="ring-total" :style="totalStyle">/{{ total }}</text>
+  </view>
+</template>
+
+<script setup>
+import { animationDuration } from '@/lib/interactions.js'
+import { ref, computed, watch, onUnmounted } from 'vue'
+const props = defineProps({ value: { type: Number, default: 0 }, total: { type: Number, default: 3 },
+  size: { type: Number, default: 132 }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 } })
+const dotCount = 14
+const roll = ref(props.value), litCount = computed(() => Math.round(roll.value / props.total * dotCount))
+let timer = null
+watch(() => [props.value, props.animated, props.speed], () => {
+  const value = props.value
+  if (timer != null) clearInterval(timer)
+  if (!props.animated) { roll.value = value; return }
+  const from = roll.value, delta = value - from, start = Date.now(), span = animationDuration(460, props.speed)
+  timer = setInterval(() => {
+    const progress = Math.min(1, (Date.now() - start) / span)
+    roll.value = from + delta * (1 - Math.pow(1 - progress, 3))
+    if (progress >= 1) { clearInterval(timer); timer = null; roll.value = value }
+  }, 16)
+})
+onUnmounted(() => { if (timer != null) clearInterval(timer) })
+const radius = computed(() => props.size / 2 - 11)
+function dotStyle(index) {
+  const angle = (index / dotCount) * Math.PI * 2 - Math.PI / 2
+  const x = props.size / 2 + Math.cos(angle) * radius.value
+  const y = props.size / 2 + Math.sin(angle) * radius.value
+  return { left: (x - 3.5) + 'px', top: (y - 3.5) + 'px', transitionDuration: animationDuration(240, props.speed, props.animated) + 'ms', transitionDelay: animationDuration(index * 14, props.speed, props.animated) + 'ms' }
+}
+const trackStyle = computed(() => ({
+  left: '14px', top: '14px', width: (props.size - 28) + 'px', height: (props.size - 28) + 'px',
+  borderRadius: ((props.size - 28) / 2) + 'px'
+}))
+const coreStyle = computed(() => ({
+  left: (props.size / 2 - 31) + 'px', top: (props.size / 2 - 31) + 'px', width: '62px', height: '62px', borderRadius: '31px'
+}))
+const totalStyle = computed(() => ({ left: (props.size / 2 + 16) + 'px', top: (props.size / 2 + 2) + 'px' }))
+</script>
+
+<style>
+.ring { position: relative; }
+.ring-track { position: absolute; border-style: solid; border-width: 1px; border-color: #dee7f3; }
+.ring-dot { position: absolute; width: 7px; height: 7px; border-radius: 4px; background-color: #d5e1f2; transition-property: background-color; transition-duration: 240ms; }
+.ring-dot-on { background-color: #1e63b4; }
+.ring-core { position: absolute; background-color: #ffffff; align-items: center; justify-content: center; }
+.digit-window { width: 34px; height: 38px; overflow: hidden; }
+.digit-strip { flex-direction: column; transition-property: transform; transition-duration: 40ms; }
+.digit { height: 38px; line-height: 38px; font-size: 26px; font-weight: 600; color: #14171a; text-align: center; }
+.ring-total { position: absolute; font-size: 14px; color: #555c62; }
+</style>

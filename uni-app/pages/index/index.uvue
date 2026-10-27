@@ -1,0 +1,1193 @@
+<template>
+  <view class="app" :style="{ paddingTop: insetTop + 'px', paddingBottom: insetBottom + 'px' }">
+    <view class="scene" :style="sceneStyle">
+    <view class="sky">
+      <view v-for="(star, si) in stars" :key="si" class="star" :style="starStyle(star, si)" />
+    </view>
+    <view class="header" :style="headerStyle">
+      <view class="menu-btn" role="button" aria-label="打开菜单" @click="openDrawer">
+        <view class="menu-line" />
+        <view class="menu-line menu-line-short" />
+        <view class="menu-line" />
+      </view>
+      <view class="header-copy">
+        <text class="header-title">{{ titles[page] }}</text>
+        <text class="header-sub">{{ toolbarSubs[page] }}</text>
+      </view>
+      <view class="status-chip" :class="headerConnected ? 'status-on' : ''">
+        <view class="status-dot" :class="headerConnected ? 'status-dot-on' : ''" />
+        <text class="status-text" :class="headerConnected ? 'status-text-on' : ''">{{ connectionShort }}</text>
+      </view>
+    </view>
+
+    <view class="stage" :style="stageStyle" @touchstart="stageStart" @touchmove="stageMove" @touchend="stageEnd" @touchcancel="resetStage">
+    <scroll-view v-if="page === 0" class="page" scroll-y>
+      <view class="page-content">
+        <text class="kicker">我的 AI 设备</text>
+        <text class="headline">KiraAI 手机助手</text>
+        <text class="lede">连接你的服务器，剩下的交给对话。</text>
+        <text class="text-link" role="button" @click="openGuide">第一次使用？跟着引导连接 ›</text>
+
+        <ConnectionHero :title="heroTitle" :note="connectionNote" :connected="state.connected" :running="state.running"
+          :address="state.address" :device="state.deviceName" :checks="checks" :copy-style="heroCopyStyle"
+          :duration="motion(480, 'cards')" :active="visible && !drawerOpen && !detailOpen && !wheel">
+          <view class="sweep-track"><view class="sweep-fill" :style="sweepStyle" /></view>
+          <view class="cta-wrap" :style="ctaWrapStyle" @touchstart="ctaDown" @touchend="ctaUp" @touchcancel="ctaUp">
+            <FeedbackButton :label="state.running ? '停止连接' : '开始连接'" busy-text="正在启动" success-text="已连接"
+              :state="connectButton" :animated="effects.feedback" :speed="speed" :active="visible && !drawerOpen && !detailOpen" :shine="false" @press="toggleConnection" />
+          </view>
+          <text v-if="connectionFeedback" class="connection-feedback">{{ connectionFeedback }}</text>
+        </ConnectionHero>
+
+        <view class="section-heading">
+          <text class="section-title">连接准备</text>
+          <text class="section-count">{{ readyCount }} / 3</text>
+        </view>
+
+        <SwipeDeck :cards="setupSteps" :checks="checks" :current="step" :width="deckWidth" :height="238"
+          :duration="motionDuration" @change="step = $event" @select="openDetail" @grab="stageLock" />
+        <text class="swipe-hint">左右滑动切换 · 轻点卡片查看步骤</text>
+
+        <view class="section-heading" role="button" :aria-expanded="expanded" @click="toggleStack"><text class="section-title">更多功能</text><text class="section-count">{{ expanded ? '收起 −' : '展开 3 项 +' }}</text></view>
+        <view class="stack" :style="stackBoxStyle">
+          <view class="stack-card stack-third" :style="stackStyle(2)" @click="openStack(2)">
+            <view class="stack-chip"><text class="stack-glyph">◌</text></view>
+            <view class="stack-copy"><text class="detail-title">虚拟麦克风实验</text><text class="muted small">先检测兼容性，再尝试测试音</text></view>
+            <text class="stack-chev">›</text>
+          </view>
+          <view class="stack-card stack-second" :style="stackStyle(1)" @click="openStack(1)">
+            <view class="stack-chip"><text class="stack-glyph">▢</text></view>
+            <view class="stack-copy"><text class="detail-title">和 Kira 通话</text><text class="muted small">{{ voice.active ? '正在通话，点击返回' : '说一句，听 AI 回应' }}</text></view>
+            <text class="stack-chev">›</text>
+          </view>
+          <view class="stack-card stack-first" :style="stackStyle(0)" role="button" :aria-expanded="expanded" @click="openStack(0)">
+            <view class="stack-chip"><text class="stack-glyph">◎</text></view>
+            <view class="stack-copy"><text class="detail-title">{{ state.deviceName }}</text><text class="muted small">{{ state.address || '还没有填写服务器地址' }}</text></view>
+            <text class="stack-chev" :class="expanded ? 'stack-chev-open' : ''">›</text>
+          </view>
+        </view>
+        <CapabilityFlip :duration="motion(600, 'cards')" @help="navigate(3)" @connect="navigate(1)" />
+        <text class="footnote">只有你允许的聊天可以使用手机。控制期间，你可以随时停止。</text>
+      </view>
+    </scroll-view>
+
+    <scroll-view v-if="page === 1" class="page" scroll-y>
+      <view class="page-content">
+        <text class="headline small-headline">接上你的服务器</text>
+        <text class="lede">复制 KiraAI“手机连接”页面中的三项内容。</text>
+        <FloatingField v-model="form.address" label="服务器地址 · 公网 IP:端口" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
+        <text class="field-note">例如 203.0.113.10:8443，不用填写长后缀。</text>
+        <FloatingField v-model="form.password" label="连接密码" :password="!showPassword" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
+        <text class="text-link" role="button" @click="showPassword = !showPassword">{{ showPassword ? '隐藏密码' : '显示密码' }}</text>
+        <FloatingField v-model="form.fingerprint" label="服务器校验码" multiline :maxlength="200" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
+        <text class="field-note">用于确认连的是你的服务器。有可信证书时可以留空。</text>
+        <view class="form-action">
+          <FeedbackButton label="保存设置" success-text="设置已保存" busy-text="正在保存" :state="saveButton" :animated="effects.feedback" :speed="speed" :active="visible" :disabled="state.running || voice.active || mic.active" @press="saveConnection" />
+        </view>
+        <text v-if="state.running || voice.active" class="field-note">修改设置前，请先停止连接并挂断通话。</text>
+        <view class="divider" />
+        <view class="list-row" @click="copyDeviceId"><view><text class="detail-title on-sky-title">设备 ID</text><text class="muted small on-sky-note">需要固定这台手机时使用</text></view><text class="card-link on-sky-link">复制</text></view>
+      </view>
+    </scroll-view>
+
+    <scroll-view v-if="page === 2" class="page" scroll-y>
+      <view class="page-content">
+        <text class="headline small-headline">界面与动效</text>
+        <text class="lede">选择你喜欢的反馈方式与动画速度。</text>
+
+        <view class="pref-hero" :class="'pref-hero-' + selection.count">
+          <ProgressRing :value="selection.count" :total="3" :size="120" :animated="effects.feedback" :speed="speed" />
+          <view class="pref-copy">
+            <text class="pref-kicker">动效清单</text>
+            <text class="pref-title">{{ selectionTitle }}</text>
+            <text class="muted small pref-note">{{ selectionNote }}</text>
+          </view>
+        </view>
+
+        <view class="preference-card">
+          <view class="check-row" role="checkbox" :aria-checked="selection.partial ? 'mixed' : selection.all ? 'true' : 'false'" @click="setAllEffects">
+            <view class="tickbox" :class="selection.count > 0 ? 'tickbox-on' : ''">
+              <text class="tick-mark" :style="{ transform: selection.count > 0 ? 'scale(1)' : 'scale(0.2)', opacity: selection.count > 0 ? 1 : 0 }">{{ selection.all ? '✓' : selection.partial ? '–' : '' }}</text>
+            </view>
+            <view class="row-copy"><text class="detail-title">界面动效</text><text class="small muted">{{ selection.count === 0 ? '已关闭，界面保持安静' : selection.all ? '已全部开启' : '已开启部分动效' }}</text></view>
+          </view>
+          <view class="divider compact" />
+          <view v-for="(option, oi) in effectOptions" :key="option.key" class="check-row child-row" role="checkbox" :aria-checked="effects[option.key]" @click="toggleEffect(option.key)">
+            <view class="tickbox" :class="effects[option.key] ? 'tickbox-on' : ''">
+              <text class="tick-mark" :style="{ transform: effects[option.key] ? 'scale(1)' : 'scale(0.2)', opacity: effects[option.key] ? 1 : 0, transitionDelay: motion(oi * 40, 'feedback') + 'ms' }">✓</text>
+            </view>
+            <view class="row-copy"><text class="detail-title">{{ option.title }}</text><text class="muted small">{{ option.note }}</text></view>
+          </view>
+        </view>
+
+        <view class="list-row speed-row" role="button" @click="openWheel">
+          <view><text class="detail-title">动画速度</text><text class="muted small">上下滑动滚轮，松手吸附到刻度</text></view>
+          <view class="speed-value"><text class="speed-label">{{ speedLabels[speed] }}</text><text class="speed-mult">{{ speedMultipliers[speed] }}</text></view>
+        </view>
+        <text class="footnote">这些设置只改变界面表现，不影响 AI 操作速度、截图大小或后台连接。</text>
+      </view>
+    </scroll-view>
+
+    <scroll-view v-if="page === 3" class="page" scroll-y>
+      <view class="page-content">
+        <view class="about-brand">
+          <view><text class="section-title">KiraAI 手机助手</text><text class="about-version small">版本 {{ state.version }} · Android</text></view>
+        </view>
+        <view class="list-row" role="button" @click="openGuide"><text class="detail-title">新手引导</text><text class="card-link">再看一遍 ›</text></view>
+        <view class="about-card">
+          <text class="detail-title">从一句话开始</text>
+          <text class="example">“检查手机连接，然后打开设置。”</text>
+          <text class="muted paragraph">先在 KiraAI 安装插件 ZIP，在“手机连接”页面填公网 IP 和允许使用的聊天。下载本 App，复制连接信息，开启无障碍，再开始连接。</text>
+        </view>
+        <view class="about-card">
+          <text class="detail-title">截图与隐私</text>
+          <text class="muted paragraph">Android 8–10 提供界面文字和按钮位置；Android 11 及以上支持按需截图，不持续录屏。菜单中的防截屏保护只保护本 App。通话需要你授权麦克风并主动开始，语音识别和回复由自己的 Kira 服务器处理。</text>
+        </view>
+        <view class="about-card">
+          <text class="detail-title">连接不顺利时</text>
+          <text class="muted paragraph">检查 IP、端口、密码和校验码。服务器需要放行手机连接端口，Docker 还需映射同一端口。后台断开时，检查手机的省电设置。</text>
+        </view>
+        <view class="divider" />
+        <view class="list-row" @click="showLicense"><text class="detail-title on-sky-title">开源组件</text><text class="card-link on-sky-link">查看 ›</text></view>
+      </view>
+    </scroll-view>
+    <scroll-view v-if="page === 4" class="page" scroll-y>
+      <view class="page-content">
+        <CallPanel :voice="voice" :mic="mic" :lab-open="labOpen" :animated="effects.feedback" :speed="speed" :visible="visible"
+          @start="startCall" @stop="stopCall" @mute="toggleMute" @speaker="toggleSpeaker" @interrupt="interruptCall"
+          @authorize="authorizeMic" @test="testMic" @stop-test="stopMic" @expand-lab="labOpen = !labOpen" />
+      </view>
+    </scroll-view>
+    </view>
+
+    <LiquidNav :page="page" :width="deckWidth + 20" :duration="motion(400, 'transition')" @change="navigate" />
+    </view>
+
+    <view v-if="drawerOpen" class="drawer-scrim" :style="{ opacity: drawerShift * 0.34 }" @click="closeDrawer" />
+    <view v-if="drawerOpen" class="drawer" :style="drawerStyle">
+      <view class="drawer-head">
+        <view class="drawer-badge"><text class="drawer-letter">AI</text></view>
+        <view>
+          <text class="drawer-title">KiraAI 手机助手</text>
+          <text class="drawer-sub">你的手机，由你掌控</text>
+        </view>
+      </view>
+      <view class="drawer-rule" />
+      <view class="drawer-body">
+        <view v-for="(item,index) in drawerItems" :key="item.key" class="drawer-item"
+          :class="item.page === page ? 'drawer-item-on' : ''" :style="drawerItemStyle(index)"
+          role="button" @touchstart="markReveal($event)" @click="drawerGo(item)">
+          <view class="drawer-dot" :class="item.page === page ? 'drawer-dot-on' : ''" />
+          <text class="drawer-label" :class="item.page === page ? 'drawer-label-on' : ''">{{ item.label }}</text>
+          <text v-if="item.note" class="drawer-note">{{ item.note }}</text>
+        </view>
+      </view>
+      <view class="drawer-foot">
+        <view class="shield-row">
+          <view v-if="shieldRippleOn" class="shield-ripple" :style="shieldRippleStyle" />
+          <view class="shield-copy" role="button" aria-label="切换防截屏保护" @click="toggleShield">
+            <text class="shield-title">防截屏保护</text>
+            <text class="shield-note" :class="shield ? '' : 'shield-note-off'">{{ shield ? '截图与录屏显示为空白' : '已关闭，界面可被截取' }}</text>
+          </view>
+          <JellySwitch :checked="shield" :disabled="shieldBusy" label="防截屏保护" :duration="motion(350, 'feedback')" @change="onShieldChange" />
+        </view>
+        <text class="drawer-version">KiraAI Phone Assistant · {{ state.version }}</text>
+      </view>
+    </view>
+
+    <view v-if="transitionOn" class="transition-veil" :style="veilStyle" />
+
+    <SpringSheet :open="wheel" :inset="insetBottom" :duration="motion(400, 'cards')" @close="wheel = false" @progress="sheetProgress = $event" @motion="sheetMs = $event">
+      <SpeedWheel :value="wheelDraft" :labels="speedLabels" :multipliers="speedMultipliers" :animated="effects.cards"
+        :duration="motion(560, 'cards')" :disabled="preferenceButton === 'success'" @change="onWheelChange" @settling="wheelSettling = $event" />
+      <view class="sheet-actions">
+        <FeedbackButton label="就用这个节奏" success-text="已保存" :disabled="wheelSettling || preferenceButton === 'success'" :state="preferenceButton" :animated="effects.feedback" :speed="speed" :active="visible" @press="confirmSpeed" />
+      </view>
+    </SpringSheet>
+
+    <SpringSheet :open="guideOpen && visible" title="从这里开始" note="四步连接 · 随时可以稍后再看" :height="guideHeight" :inset="insetBottom" :duration="motion(400, 'cards')" @close="closeGuide" @progress="sheetProgress = $event" @motion="sheetMs = $event">
+      <QuickStart v-if="guideOpen" :duration="motion(400, 'cards')" :animated="effects.feedback" :speed="speed" :active="visible" :configured="state.configured" :accessibility="state.accessibility" :connected="state.connected" @action="guideAction" @close="closeGuide" />
+    </SpringSheet>
+
+    <view v-if="detailOpen" class="detail-veil" @click="closeDetail()" />
+    <view v-show="detailOpen" class="detail-panel" :style="detailStyle">
+      <StickyDetail :active="detailOpen" :index="detailIndex" :title="setupSteps[detailIndex].title" :description="setupSteps[detailIndex].description" :action="setupSteps[detailIndex].action" :duration="motion(400, 'cards')" @close="closeDetail()" @action="detailAction" />
+    </view>
+  </view>
+</template>
+
+<script setup>
+import { ref, reactive, computed, nextTick, onUnmounted } from 'vue'
+import { onShow, onHide, onReady, onBackPress } from '@dcloudio/uni-app'
+import FeedbackButton from '@/components/FeedbackButton.uvue'
+import ProgressRing from '@/components/ProgressRing.uvue'
+import SwipeDeck from '@/components/SwipeDeck.uvue'
+import SpeedWheel from '@/components/SpeedWheel.uvue'
+import CallPanel from '@/components/CallPanel.uvue'
+import LiquidNav from '@/components/LiquidNav.uvue'
+import JellySwitch from '@/components/JellySwitch.uvue'
+import FloatingField from '@/components/FloatingField.uvue'
+import SpringSheet from '@/components/SpringSheet.uvue'
+import ConnectionHero from '@/components/ConnectionHero.uvue'
+import CapabilityFlip from '@/components/CapabilityFlip.uvue'
+import StickyDetail from '@/components/StickyDetail.uvue'
+import QuickStart from '@/components/QuickStart.uvue'
+import { createTimeoutScope } from '@/lib/timers.js'
+import { phone, errorText } from '@/lib/phone.js'
+import { readiness, nextSetupStep, selectionState, toggleAll, animationDuration } from '@/lib/interactions.js'
+
+const timeouts = createTimeoutScope()
+const later = timeouts.after, cancelLater = timeouts.cancel
+const visible = ref(true), wheelSettling = ref(false)
+const guideOpen = ref(false), guideHeight = ref(560)
+function openGuide() { wheel.value = false; guideOpen.value = true }
+function closeGuide() {
+  guideOpen.value = false
+  try { uni.setStorageSync('kira-quick-start-v1', true) } catch (error) { toast('引导进度未能保存，下次仍可从首页打开') }
+}
+function guideAction(index) {
+  if (index === 2) { try { phone.openAccessibility() } catch (error) { toast(errorText(error)) }; return }
+  closeGuide(); navigate(index === 1 ? 1 : 0)
+}
+let disposed = false, confirming = false, confirmationRevision = 0
+const titles = ['设备连接', '连接设置', '界面偏好', '使用说明与关于', '和 Kira 通话']
+const tabs = ['设备', '设置', '偏好', '关于', '通话']
+const toolbarSubs = ['本机连接与准备', '服务器地址与校验码', '动效清单与动画速度', '版本、隐私与帮助', '用声音连接你的 AI']
+const setupSteps = [
+  { short: '填地址', title: '连接你的服务器', description: '只需要 IP、端口，以及页面中的连接信息。', action: '填写连接设置' },
+  { short: '开权限', title: '让手机可以操作', description: '在系统设置中开启本 App 的无障碍服务。', action: '打开无障碍设置' },
+  { short: '连手机', title: '准备好，就出发', description: '连接后，在允许的聊天里向 AI 下达任务。', action: '检查连接' }
+]
+const effectOptions = [
+  { key: 'feedback', title: '完成反馈', note: '成功时按钮收成勾号，周围迸发粒子' },
+  { key: 'cards', title: '卡片与弹窗', note: '叠卡、翻面、滑动吸附和弹窗回弹' },
+  { key: 'transition', title: '页面切换', note: '胶囊跟随页签，页面轻轻推入' }
+]
+const navOrder = [0, 1, 4, 2]
+const sheetProgress = ref(0), sheetMs = ref(0)
+const sceneStyle = computed(() => ({ transform: 'scale(' + (1 - sheetProgress.value * 0.08) + ')', borderRadius: sheetProgress.value > 0 ? '28px' : '0px', transitionDuration: sheetMs.value + 'ms' }))
+const page = ref(0), expanded = ref(false), wheel = ref(false), step = ref(0)
+const insetTop = ref(24), insetBottom = ref(12), speed = ref(1), showPassword = ref(false)
+const wheelDraft = ref(1), deckWidth = ref(346), tabWidth = ref(92), revealX = ref(0), revealY = ref(0)
+const transitionOn = ref(false)
+const veilStyle = ref({ left: '0px', top: '0px', width: '0px', height: '0px', borderRadius: '0px',
+  transform: 'scale(0.02)', opacity: 1, transitionDuration: '0ms' })
+const veilTimers = []
+const stageX = ref(0), stageScale = ref(1), stageMs = ref(0), stageOpacity = ref(1)
+const stageEase = ref('cubic-bezier(0.24,1.4,0.4,1)')
+const pillSquash = ref(1)
+const tabYield = ref(false)
+const drawerOpen = ref(false), drawerShift = ref(0), drawerMs = ref(0)
+const starTwinkle = ref(false)
+const stars = []
+for (let i = 0; i < 12; i++) {
+  stars.push({ left: (i * 37 + 5) % 96, top: (i * 61 + 7) % 86, size: 1 + (i % 3), base: 0.22 + (i % 6) * 0.10 })
+}
+function starStyle(star, index) {
+  return {
+    left: star.left + '%', top: star.top + '%', width: star.size + 'px', height: star.size + 'px',
+    opacity: starTwinkle.value ? star.base * 0.45 : star.base,
+    transitionDuration: motion(1800, 'transition') + 'ms', transitionDelay: motion(index * 70, 'transition') + 'ms'
+  }
+}
+const shield = ref(true), shieldBusy = ref(false), shieldRevision = ref(0)
+const shieldRippleOn = ref(false)
+const shieldRippleStyle = ref({ transform: 'scale(0.3)', opacity: 0.4, transitionDuration: '0ms' })
+const drawerEase = ref('cubic-bezier(0.22,1.12,0.36,1)')
+const heroOpacity = ref(1), heroLift = ref(0), heroMs = ref(0)
+const heroEase = ref('cubic-bezier(0.24,1.3,0.4,1)')
+const heroOverride = ref('')
+const heroSnapshot = ref(null), heroEntering = ref(false)
+const sweepProgress = ref(0), sweepOpacity = ref(0)
+const ctaBreath = ref(false), ctaPress = ref(false)
+let ctaBreathTimer = null
+const drawerItems = [
+  { key: 'device', label: '设备连接', page: 0, note: '' },
+  { key: 'setup', label: '连接设置', page: 1, note: '' },
+  { key: 'prefs', label: '界面偏好', page: 2, note: '' },
+  { key: 'about', label: '使用说明与关于', page: 3, note: '' },
+  { key: 'call', label: '和 Kira 通话', page: 4, note: '语音' }
+]
+const detailOpen = ref(false), detailIndex = ref(0), detailBusy = ref(false)
+const detailLeft = ref(10), detailTop = ref(30), detailWidth = ref(370), detailHeight = ref(700)
+const detailX = ref(0), detailY = ref(0), detailSX = ref(1), detailSY = ref(1)
+const detailOpacity = ref(1), detailMs = ref(0), detailEase = ref('cubic-bezier(0.22,0.95,0.3,1)')
+const detailFrom = { x: 0, y: 0, sx: 1, sy: 1 }
+const stageStyle = computed(() => ({
+  transform: 'translateX(' + stageX.value + 'px) scale(' + stageScale.value + ')',
+  opacity: stageOpacity.value,
+  transitionDuration: stageMs.value + 'ms',
+  transitionTimingFunction: stageEase.value
+}))
+const headerStyle = computed(() => ({
+  transform: 'translateX(' + (stageX.value * 0.18) + 'px)',
+  opacity: 1 - Math.min(0.2, Math.abs(stageX.value) / 900),
+  transitionDuration: stageMs.value + 'ms',
+  transitionTimingFunction: stageEase.value
+}))
+const drawerStyle = computed(() => ({
+  transform: 'translateX(' + ((drawerShift.value - 1) * 300) + 'px)',
+  transitionDuration: drawerMs.value + 'ms',
+  transitionTimingFunction: drawerEase.value
+}))
+function drawerItemStyle(index) {
+  const shift = drawerShift.value
+  return {
+    opacity: shift,
+    transform: 'translateX(' + ((1 - shift) * -14) + 'px)',
+    transitionDuration: motion(260, 'transition') + 'ms',
+    transitionDelay: motion(shift === 1 ? 60 + index * 36 : 0, 'transition') + 'ms',
+    transitionTimingFunction: 'cubic-bezier(0.24,1.2,0.36,1)'
+  }
+}
+const heroCopyStyle = computed(() => ({
+  opacity: heroOpacity.value,
+  transform: 'translateY(' + heroLift.value + 'px)',
+  transitionDuration: heroMs.value + 'ms',
+  transitionTimingFunction: heroEase.value
+}))
+const sweepStyle = computed(() => ({
+  transform: 'scaleX(' + sweepProgress.value / 100 + ')',
+  opacity: sweepOpacity.value,
+  transitionProperty: 'transform, opacity',
+  transitionDuration: motion(560, 'transition') + 'ms, ' + motion(240, 'transition') + 'ms',
+  transitionTimingFunction: 'cubic-bezier(0.3,0.9,0.35,1), ease'
+}))
+const ctaWrapStyle = computed(() => ({
+  transform: 'scale(' + (ctaPress.value ? 0.97 : 1) + ')',
+  transitionProperty: 'transform',
+  transitionDuration: motion(ctaPress.value ? 110 : 300, 'transition') + 'ms',
+  transitionTimingFunction: ctaPress.value ? 'ease-out' : 'cubic-bezier(0.24,1.5,0.4,1)'
+}))
+const ctaHaloStyle = computed(() => ({
+  opacity: ctaBreath.value ? 0.9 : 0.4,
+  transform: 'scale(' + (ctaBreath.value ? 1.025 : 1) + ')',
+  transitionProperty: 'opacity, transform',
+  transitionDuration: motion(1600, 'transition') + 'ms',
+  transitionTimingFunction: 'ease-in-out'
+}))
+const detailStyle = computed(() => ({
+  left: detailLeft.value + 'px', top: detailTop.value + 'px',
+  width: detailWidth.value + 'px', height: detailHeight.value + 'px',
+  opacity: detailOpacity.value,
+  transform: 'translate(' + detailX.value + 'px,' + detailY.value + 'px) scaleX(' + detailSX.value + ') scaleY(' + detailSY.value + ')',
+  transformOrigin: 'left top',
+  transitionDuration: detailMs.value + 'ms',
+  transitionTimingFunction: detailEase.value
+}))
+const speedLabels = ['轻快', '舒适', '从容']
+const speedMultipliers = ['更快', '标准', '更慢']
+const state = reactive({ running: false, connected: false, configured: false, accessibility: false, status: '正在读取',
+  deviceName: 'Android 手机', deviceId: '', address: '', sdk: 30, version: '—', animationSpeed: 1 })
+const form = reactive({ address: '', password: '', fingerprint: '' })
+const voice = reactive({ active: false, status: 'idle', detail: '', microphoneGranted: false, muted: false, speaker: true, level: 0, transcripts: [] })
+const mic = reactive({ supported: false, authorized: false, active: false, status: 'idle', detail: '', verified: false, latencyMs: -1 })
+const labOpen = ref(false)
+const effects = reactive({ feedback: true, cards: true, transition: true })
+const saveButton = ref('idle'), connectButton = ref('idle'), preferenceButton = ref('idle')
+const connectionFeedback = ref('')
+const checks = computed(() => readiness(state)), selection = computed(() => selectionState(effects))
+const readyCount = computed(() => checks.value.filter(value => value).length)
+function motion(base, effect = 'cards') { return animationDuration(base, speed.value, effects[effect]) }
+const motionDuration = computed(() => motion(320))
+const liveConnectionNote = computed(() => heroOverride.value === 'connecting' ? '正在和服务器握手，请稍候。' : state.connected ? '现在可以切到聊天，告诉 AI 你想做什么。' : state.running ? state.status : state.status === '已停止' ? '按需查看屏幕、点击和输入。你始终可以停止。' : state.status)
+const liveHeroTitle = computed(() => heroOverride.value === 'connecting' ? '正在连接' : state.connected ? '手机已就绪' : state.running ? '正在连接' : '准备连接')
+const heroTitle = computed(() => heroSnapshot.value ? heroSnapshot.value.title : liveHeroTitle.value)
+const connectionNote = computed(() => heroSnapshot.value ? heroSnapshot.value.note : liveConnectionNote.value)
+const heroPill = computed(() => state.connected ? '已就绪' : state.running ? '连接中' : '待连接')
+const headerConnected = computed(() => page.value === 4 ? voice.connected === true : state.connected)
+const connectionShort = computed(() => page.value === 4 ? voice.connected ? '通话中' : voice.active ? '接通中' : '未通话' : state.connected ? '在线' : state.running ? '连接中' : '未连接')
+const selectionTitle = computed(() => selection.value.all ? '全部开启' : selection.value.count === 0 ? '全部关闭' : '已开启 ' + selection.value.count + ' 项')
+const selectionNote = computed(() => selection.value.all ? '所有动效都会播放' : selection.value.count === 0 ? '界面保持安静，只保留必要反馈' : '没勾选的动效会安静下来')
+const stackBoxStyle = computed(() => ({ height: (expanded.value ? 300 : 120) + 'px' }))
+function tabItemStyle(index) {
+  const yieldOn = tabYield.value && index !== page.value
+  const dir = index < page.value ? -1 : 1
+  return {
+    transform: yieldOn ? 'translateX(' + (dir * 3) + 'px) scale(0.94)' : 'translateX(0px) scale(1)'
+  }
+}
+const tabPillStyle = computed(() => ({
+  width: tabWidth.value + 'px',
+  transform: 'translateX(' + page.value * 100 + '%) scaleX(' + pillSquash.value + ')',
+  transitionDuration: motion(pillSquash.value > 1 ? 140 : 380) + 'ms',
+  transitionTimingFunction: pillSquash.value > 1 ? 'cubic-bezier(0.35,0.7,0.4,1)' : 'cubic-bezier(0.34,1.56,0.64,1)'
+}))
+let poll = null, successTimer = null, preferenceTimer = null, startTimer = null
+let pillTimer = null, stageTimer = null, detailTimer = null
+let drawerTimer = null, heroTimer = null, sweepTimer = null, starTimer = null, shieldRippleTimer = null
+let stageActive = false, stageAxis = 0, stageStartX = 0, stageStartY = 0, stageLastX = 0, stageLastT = 0, stageVelocity = 0
+let deckLockUntil = 0
+let detailActive = false, detailStartY = 0, detailStartX = 0, detailLastY = 0, detailLastT = 0, detailVelocity = 0
+let previousConnected = false, previousRunning = false, starting = false
+
+function toast(message) { uni.showToast({ title: message, icon: 'none', duration: 2800 }) }
+function refresh(forceDiagnostics = true) {
+  try {
+    const value = JSON.parse(phone.readState())
+    Object.assign(state, value)
+    if (typeof value.screenProtected === 'boolean') shield.value = value.screenProtected
+    if (value.connected && !previousConnected) {
+      cancelHeroTransition()
+      connectButton.value = 'success'
+      if (successTimer != null) cancelLater(successTimer)
+      successTimer = later(() => { connectButton.value = 'idle' }, motion(1400, 'feedback'))
+    } else if (!value.running && !starting) connectButton.value = 'idle'
+    if (!value.running && !starting && previousRunning) cancelHeroTransition()
+    previousConnected = value.connected
+    previousRunning = value.running
+  } catch (error) { state.status = errorText(error) }
+  refreshVoice(forceDiagnostics || mic.active || mic.status === 'authorizing' || mic.status === 'binding' || (page.value === 4 && labOpen.value))
+}
+function mergeSnapshot(target, value) {
+  for (const key of Object.keys(value)) {
+    const next = value[key], previous = target[key]
+    if (next !== null && typeof next === 'object' && JSON.stringify(previous) === JSON.stringify(next)) continue
+    if (previous !== next) target[key] = next
+  }
+}
+function refreshVoice(includeDiagnostics = true) {
+  try { if (typeof phone.readCallState === 'function') mergeSnapshot(voice, JSON.parse(phone.readCallState())) }
+  catch (error) { voice.detail = errorText(error) }
+  try { if (includeDiagnostics && typeof phone.readVirtualMicState === 'function') mergeSnapshot(mic, JSON.parse(phone.readVirtualMicState())) }
+  catch (error) { mic.detail = errorText(error) }
+}
+function voiceAction(action) { try { action(); refreshVoice() } catch (error) { refreshVoice(); toast(errorText(error)) } }
+function startCall() {
+  refreshVoice()
+  if (voice.active) return
+  if (mic.active) { toast('请先停止虚拟麦克风测试'); return }
+  if (!voice.microphoneGranted) { voiceAction(() => phone.requestMicrophone()); return }
+  if (!state.configured) { toast('请先填写并保存服务器连接设置'); navigate(1); return }
+  voiceAction(() => phone.startCall())
+}
+function stopCall() { voiceAction(() => phone.stopCall()) }
+function toggleMute() { voiceAction(() => phone.setCallMuted(!voice.muted)) }
+function toggleSpeaker() { voiceAction(() => phone.setCallSpeaker(!voice.speaker)) }
+function interruptCall() { voiceAction(() => phone.interruptCall()) }
+function authorizeMic() { voiceAction(() => phone.authorizeVirtualMic()) }
+function testMic(target) {
+  refreshVoice()
+  if (voice.active) { toast('请先挂断 App 通话'); return }
+  if (mic.active) return
+  if (target === 'top.kira.phone' && !voice.microphoneGranted) { voiceAction(() => phone.requestMicrophone()); return }
+  voiceAction(() => phone.testVirtualMic(target))
+}
+function stopMic() { voiceAction(() => phone.stopVirtualMic()) }
+watch(() => page.value === 4 && labOpen.value, open => { if (open && visible.value) refreshVoice() })
+function startPolling() { refresh(); if (poll == null) poll = setInterval(() => refresh(false), 900) }
+function stopPolling() { if (poll != null) clearInterval(poll); poll = null }
+function startCta() { stopCta() }
+function stopCta() {
+  if (ctaBreathTimer != null) { clearInterval(ctaBreathTimer); ctaBreathTimer = null }
+  ctaBreath.value = false
+}
+function ctaDown() { if (effects.transition) ctaPress.value = true }
+function ctaUp() { ctaPress.value = false }
+onReady(() => {
+  const window = uni.getWindowInfo()
+  insetTop.value = window.statusBarHeight || 24
+  insetBottom.value = window.safeAreaInsets ? Math.max(12, window.safeAreaInsets.bottom) : 12
+  guideHeight.value = Math.min(600, Math.max(320, window.windowHeight - insetTop.value - 20))
+  deckWidth.value = Math.max(280, window.windowWidth - 40)
+  tabWidth.value = Math.max(48, (window.windowWidth - 20) / titles.length)
+  try {
+    phone.prepare(); refresh(); Object.assign(form, JSON.parse(phone.readConfig()))
+    const saved = uni.getStorageSync('kira-ui-effects')
+    if (saved && typeof saved === 'object') for (const key of ['feedback', 'cards', 'transition']) if (typeof saved[key] === 'boolean') effects[key] = saved[key]
+    const savedSpeed = Number(state.animationSpeed)
+    speed.value = Number.isInteger(savedSpeed) && savedSpeed >= 0 && savedSpeed <= 2 ? savedSpeed : 1
+    const savedShield = uni.getStorageSync('kira-shield')
+    if (state.secureConfigured === false && typeof savedShield === 'boolean') setShield(savedShield)
+    refresh()
+    step.value = nextSetupStep(state)
+    if (!state.configured && uni.getStorageSync('kira-quick-start-v1') !== true) guideOpen.value = true
+  } catch (error) { toast(errorText(error)) }
+  startCta()
+  startStars()
+})
+function startStars() { if (starTimer != null) clearInterval(starTimer); starTimer = null }
+onShow(() => { visible.value = true; try { phone.secure() } catch (error) { toast(errorText(error)) }; startPolling(); startCta(); startStars() })
+onHide(() => { visible.value = false; stopPolling(); stopCta(); startStars(); showPassword.value = false; resetStage(); cancelHeroTransition(); starting = false; confirming = false; confirmationRevision++; connectButton.value = 'idle'; connectionFeedback.value = '' })
+onUnmounted(() => {
+  disposed = true; timeouts.dispose()
+  stopPolling()
+  stopCta()
+  if (starTimer != null) { clearInterval(starTimer); starTimer = null }
+  for (const timer of [successTimer, preferenceTimer, startTimer, pillTimer, stageTimer, detailTimer, drawerTimer, heroTimer, sweepTimer, shieldRippleTimer]) if (timer != null) cancelLater(timer)
+  while (veilTimers.length > 0) cancelLater(veilTimers.pop())
+})
+onBackPress(() => {
+  if (guideOpen.value) { closeGuide(); return true }
+  if (drawerOpen.value) { closeDrawer(); return true }
+  if (detailOpen.value) { closeDetail(); return true }
+  if (wheel.value) { wheel.value = false; return true }
+  if (page.value !== 0) { navigate(0); return true }
+  return false
+})
+
+function markReveal(event) {
+  const touches = event && event.touches ? event.touches : []
+  if (touches.length > 0) { revealX.value = touches[0].clientX; revealY.value = touches[0].clientY }
+}
+function applyPage(index) {
+  page.value = index; showPassword.value = false
+  // The form is loaded onReady and after saving. Navigating back must not erase
+  // a draft entered before visiting Android's accessibility settings.
+}
+function playReveal(x, y, index) {
+  // 只做按钮附近 1–2 圈的涟漪，不再整屏铺开
+  const radius = 96
+  applyPage(index)
+  transitionOn.value = true
+  veilStyle.value = Object.assign({}, veilStyle.value, {
+    left: (x - radius) + 'px', top: (y - radius) + 'px',
+    width: (radius * 2) + 'px', height: (radius * 2) + 'px', borderRadius: radius + 'px',
+    transform: 'scale(0.22)', opacity: 0.9, transitionDuration: '0ms'
+  })
+  nextTick(() => {
+    veilTimers.push(later(() => {
+      veilStyle.value = Object.assign({}, veilStyle.value, {
+        transform: 'scale(1)', opacity: 0, transitionDuration: motion(300, 'transition') + 'ms'
+      })
+    }, 24))
+  })
+  veilTimers.push(later(() => {
+    transitionOn.value = false
+    veilStyle.value = Object.assign({}, veilStyle.value, { transitionDuration: '0ms' })
+  }, motion(300, 'transition') + 50))
+}
+function fluidPill() {
+  pillSquash.value = 1.32
+  tabYield.value = true
+  if (pillTimer != null) cancelLater(pillTimer)
+  pillTimer = later(() => { pillSquash.value = 1; tabYield.value = false; pillTimer = null }, motion(140))
+}
+function navigate(index) {
+  if (page.value === index) return
+  const direction = navOrder.indexOf(index) >= navOrder.indexOf(page.value) ? 1 : -1
+  if (detailOpen.value) closeDetail()
+  resetStage(); applyPage(index)
+  revealX.value = 0; revealY.value = 0
+  if (!effects.transition) return
+  stageX.value = direction * 24; stageOpacity.value = 0.6
+  nextTick(() => {
+    stageTimer = later(() => {
+      stageMs.value = motion(400, 'transition'); stageEase.value = 'cubic-bezier(0.22,1.12,0.36,1)'
+      stageX.value = 0; stageOpacity.value = 1
+      stageTimer = later(() => { stageTimer = null; stageMs.value = 0 }, stageMs.value + 20)
+    }, 16)
+  })
+}
+function enterFromRight() {
+  if (!effects.transition) return
+  const width = uni.getWindowInfo().windowWidth
+  if (stageTimer != null) { cancelLater(stageTimer); stageTimer = null }
+  stageMs.value = 0
+  stageX.value = width * 0.16
+  stageScale.value = 0.985
+  stageOpacity.value = 0.4
+  nextTick(() => {
+    stageTimer = later(() => {
+      stageMs.value = motion(340, 'transition')
+      stageEase.value = 'cubic-bezier(0.22,0.95,0.3,1)'
+      stageX.value = 0
+      stageScale.value = 1
+      stageOpacity.value = 1
+      stageTimer = later(() => { stageTimer = null; stageMs.value = 0 }, motion(340, 'transition') + 40)
+    }, 16)
+  })
+}
+function resetStage() {
+  stageActive = false
+  if (stageTimer != null) { cancelLater(stageTimer); stageTimer = null }
+  stageMs.value = 0
+  stageX.value = 0
+  stageScale.value = 1
+  stageOpacity.value = 1
+}
+function animateStage(target, ms, ease, done = null) {
+  stageScale.value = 1; stageOpacity.value = 1
+  ms = motion(ms)
+  if (stageTimer != null) { cancelLater(stageTimer); stageTimer = null }
+  stageEase.value = ease
+  stageMs.value = ms
+  stageX.value = target
+  stageTimer = later(() => {
+    stageTimer = null
+    stageMs.value = 0
+    if (done) done()
+  }, ms + 20)
+}
+function cancelHeroTransition() {
+  if (startTimer != null) cancelLater(startTimer)
+  if (successTimer != null) cancelLater(successTimer)
+  startTimer = null; successTimer = null
+  if (heroTimer != null) cancelLater(heroTimer)
+  if (sweepTimer != null) cancelLater(sweepTimer)
+  heroTimer = null; sweepTimer = null
+  heroOverride.value = ''; heroSnapshot.value = null; heroEntering.value = false
+  heroOpacity.value = 1; heroLift.value = 0; heroMs.value = 0
+  sweepOpacity.value = 0; sweepProgress.value = 0
+}
+function runHeroTransition(next, begin) {
+  cancelHeroTransition()
+  if (!effects.transition || !visible.value) { begin(); return }
+  heroSnapshot.value = { title: liveHeroTitle.value, note: liveConnectionNote.value }
+  heroEntering.value = true
+  heroMs.value = motion(190, 'transition')
+  heroEase.value = 'cubic-bezier(0.4,0,0.7,0.2)'
+  heroOpacity.value = 0; heroLift.value = -8
+  sweepOpacity.value = 1; sweepProgress.value = 0
+  heroTimer = later(() => {
+    heroSnapshot.value = null; heroOverride.value = next
+    heroMs.value = 0; heroLift.value = 10
+    sweepProgress.value = 100
+    begin()
+    if (!heroEntering.value) return
+    heroTimer = later(() => {
+      heroMs.value = motion(360, 'transition')
+      heroEase.value = 'cubic-bezier(0.24,1.3,0.4,1)'
+      heroOpacity.value = 1; heroLift.value = 0
+      heroTimer = later(() => { heroOverride.value = ''; heroEntering.value = false; heroTimer = null }, motion(360, 'transition'))
+    }, 16)
+    sweepTimer = later(() => { sweepOpacity.value = 0; sweepTimer = null }, motion(640, 'transition'))
+  }, motion(190, 'transition'))
+}
+function openDrawer() {
+  if (drawerOpen.value) return
+  if (detailOpen.value) closeDetail()
+  if (wheel.value) wheel.value = false
+  drawerOpen.value = true
+  drawerMs.value = 0
+  drawerShift.value = 0
+  drawerTimer = later(() => {
+    drawerMs.value = motion(320, 'transition')
+    drawerEase.value = 'cubic-bezier(0.22,1.12,0.36,1)'
+    drawerShift.value = 1
+  }, 16)
+}
+function closeDrawer() {
+  if (!drawerOpen.value) return
+  drawerMs.value = motion(300, 'transition')
+  drawerEase.value = 'cubic-bezier(0.4,0,0.7,0.2)'
+  drawerShift.value = 0
+  if (drawerTimer != null) cancelLater(drawerTimer)
+  drawerTimer = later(() => { drawerOpen.value = false; drawerTimer = null }, drawerMs.value + 20)
+}
+function drawerGo(item) {
+  if (item.page < 0) { closeDrawer(); toast('更多功能正在开发'); return }
+  closeDrawer()
+  navigate(item.page)
+}
+function popShieldRipple() {
+  if (!effects.transition) return
+  if (shieldRippleTimer != null) cancelLater(shieldRippleTimer)
+  shieldRippleOn.value = true
+  shieldRippleStyle.value = { transform: 'scale(0.3)', opacity: 0.45, transitionDuration: '0ms' }
+  shieldRippleTimer = later(() => {
+    shieldRippleStyle.value = { transform: 'scale(1)', opacity: 0, transitionDuration: motion(300, 'transition') + 'ms' }
+    shieldRippleTimer = later(() => { shieldRippleOn.value = false; shieldRippleTimer = null }, motion(300, 'transition') + 40)
+  }, 16)
+}
+function setShield(next) {
+  if (shieldBusy.value) return
+  shieldBusy.value = true
+  try {
+    const applied = phone.setSecure(next)
+    if (applied !== next) throw new Error('系统未应用截屏保护设置')
+    shield.value = applied
+    popShieldRipple()
+    if (!applied) toast('已关闭防截屏保护，截图可以拍到界面')
+  } catch (error) { refresh(); toast(errorText(error)) }
+  finally { shieldBusy.value = false; shieldRevision.value += 1 }
+}
+function onShieldChange(event) { setShield(event.detail.value === true) }
+function toggleShield() { setShield(!shield.value) }
+function stageLock() { stageActive = false; deckLockUntil = Date.now() + 700 }
+function stageStart(event) {
+  if (detailOpen.value || wheel.value || drawerOpen.value || transitionOn.value || Date.now() < deckLockUntil) { stageActive = false; return }
+  const touch = event.touches[0]
+  if (stageTimer != null) { cancelLater(stageTimer); stageTimer = null }
+  stageActive = true; stageAxis = 0
+  stageStartX = touch.clientX; stageStartY = touch.clientY
+  stageLastX = stageStartX; stageLastT = Date.now(); stageVelocity = 0
+  stageMs.value = 0
+}
+function stageMove(event) {
+  if (!stageActive) return
+  const touch = event.touches[0]
+  const dx = touch.clientX - stageStartX, dy = touch.clientY - stageStartY
+  if (stageAxis === 0 && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) stageAxis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 1 : 2
+  if (stageAxis !== 1) return
+  const width = uni.getWindowInfo().windowWidth
+  let next = dx
+  // 物理碰撞：第一页向右、最后一页向左时撞墙，阻尼后回弹
+  if ((page.value === 0 && dx > 0) || (page.value === navOrder[navOrder.length - 1] && dx < 0)) next = dx * 0.28
+  stageX.value = next
+  if (!effects.cards) return
+  stageScale.value = 1 - Math.min(0.035, Math.abs(next) / width * 0.05)
+  const now = Date.now()
+  const dt = Math.max(8, now - stageLastT)
+  stageVelocity = (touch.clientX - stageLastX) / dt
+  stageLastX = touch.clientX; stageLastT = now
+}
+function stageEnd() {
+  if (!stageActive) return
+  stageActive = false
+  const width = uni.getWindowInfo().windowWidth
+  if (stageAxis !== 1) { animateStage(0, 380, 'cubic-bezier(0.24,1.4,0.4,1)'); return }
+  if (Date.now() - stageLastT > 120) stageVelocity = 0
+  const threshold = width * 0.2
+  const goNext = stageX.value < -threshold || stageVelocity < -0.5
+  const goPrev = stageX.value > threshold || stageVelocity > 0.5
+  const position = navOrder.indexOf(page.value)
+  const next = position + (goNext ? 1 : goPrev ? -1 : 0)
+  const target = position < 0 || next < 0 || next >= navOrder.length ? page.value : navOrder[next]
+  if (target === page.value || target < 0 || target >= titles.length) {
+    animateStage(0, 460, 'cubic-bezier(0.24,1.42,0.4,1)')
+    return
+  }
+  if (!effects.cards) { resetStage(); applyPage(target); return }
+  const direction = goNext ? -1 : 1
+  stageEase.value = 'cubic-bezier(0.22,0.9,0.3,1)'
+  stageMs.value = motion(230)
+  stageX.value = direction * width
+  stageScale.value = 0.985
+  stageOpacity.value = 0.72
+  if (stageTimer != null) cancelLater(stageTimer)
+  stageTimer = later(() => {
+    stageTimer = null
+    applyPage(target)
+    if (effects.cards) fluidPill()
+    stageMs.value = 0
+    stageX.value = 0
+    stageScale.value = 0.99
+    stageOpacity.value = 1
+    nextTick(() => {
+      stageMs.value = motion(180)
+      stageScale.value = 1
+      stageTimer = later(() => { stageTimer = null; stageMs.value = 0 }, motion(180) + 20)
+    })
+  }, motion(230) + 20)
+}
+function segStyle(index) {
+  const fill = step.value >= index ? 100 : 0
+  return { width: fill + '%', transitionDuration: motionDuration.value + 'ms', transitionDelay: motion(index * 70) + 'ms' }
+}
+function nodeClass(index) {
+  if (checks.value[index]) return 'seg-node-done'
+  return step.value === index ? 'seg-node-current' : ''
+}
+function toggleStack() { expanded.value = !expanded.value }
+function openStack(index) {
+  if (!expanded.value) { expanded.value = true; return }
+  if (index === 0) { navigate(1); return }
+  labOpen.value = index === 2
+  navigate(4)
+}
+function stackStyle(index) {
+  return {
+    top: '0px',
+    transform: 'translateY(' + (expanded.value ? index * 100 : index * 9) + 'px) scale(' + (expanded.value ? 1 : 1 - index * 0.035) + ')',
+    zIndex: 3 - index,
+    transitionDuration: motionDuration.value + 'ms',
+    transitionDelay: motion(expanded.value ? index * 70 : (2 - index) * 50) + 'ms'
+  }
+}
+function runStep(index) {
+  if (index === 0) navigate(1)
+  else if (index === 1) try { phone.openAccessibility() } catch (error) { toast(errorText(error)) }
+  else { refresh(); if (state.connected) toast('手机已经连上了'); else toggleConnection() }
+}
+function openDetail(selection) {
+  const index = selection.index
+  if (!effects.cards) { runStep(index); return }
+  if (detailOpen.value || detailBusy.value) return
+  const window = uni.getWindowInfo()
+  detailIndex.value = index
+  detailWidth.value = window.windowWidth - 20
+  detailHeight.value = window.windowHeight - insetTop.value - insetBottom.value - 24
+  detailLeft.value = 10
+  detailTop.value = insetTop.value + 12
+  const rect = selection.rect
+  if (rect && rect.width > 0 && rect.height > 0) {
+    detailFrom.sx = rect.width / detailWidth.value
+    detailFrom.sy = rect.height / detailHeight.value
+    detailFrom.x = rect.left - detailLeft.value
+    detailFrom.y = rect.top - detailTop.value
+  } else {
+    detailFrom.sx = 0.7; detailFrom.sy = 0.24; detailFrom.x = 30; detailFrom.y = 180
+  }
+  detailDuration(0)
+  detailX.value = detailFrom.x; detailY.value = detailFrom.y
+  detailSX.value = detailFrom.sx; detailSY.value = detailFrom.sy
+  detailOpacity.value = 1
+  detailBusy.value = true
+  detailOpen.value = true
+  nextTick(() => {
+    if (disposed || !detailOpen.value || detailTimer != null) return
+    // The first committed frame already matches the tapped card's bounds.
+    detailTimer = later(() => {
+      detailDuration(360)
+      detailX.value = 0; detailY.value = 0
+      detailSX.value = 1; detailSY.value = 1
+      detailTimer = later(() => { detailTimer = null; detailBusy.value = false }, detailMs.value + 20)
+    }, 26)
+  })
+}
+function detailDuration(ms) { detailMs.value = motion(ms); detailEase.value = ms > 0 ? 'cubic-bezier(0.22,0.95,0.3,1)' : 'linear' }
+function closeDetail(done = null) {
+  if (!detailOpen.value) { if (done) done(); return }
+  detailBusy.value = true
+  if (detailTimer != null) { cancelLater(detailTimer); detailTimer = null }
+  detailDuration(300)
+  detailX.value = detailFrom.x; detailY.value = detailFrom.y
+  detailSX.value = detailFrom.sx; detailSY.value = detailFrom.sy
+  detailOpacity.value = 0.1
+  detailTimer = later(() => {
+    detailTimer = null
+    detailOpen.value = false
+    detailBusy.value = false
+    detailOpacity.value = 1
+    detailX.value = 0; detailY.value = 0; detailSX.value = 1; detailSY.value = 1
+    detailMs.value = 0
+    if (done) done()
+  }, detailMs.value > 0 ? detailMs.value + 20 : 0)
+}
+function detailAction() {
+  const index = detailIndex.value
+  if (detailBusy.value) return
+  closeDetail(() => runStep(index))
+}
+function detailStart(event) {
+  if (detailBusy.value) { detailActive = false; return }
+  const touch = event.touches[0]
+  detailActive = true
+  detailStartY = touch.clientY; detailStartX = touch.clientX
+  detailLastY = detailStartY; detailLastT = Date.now(); detailVelocity = 0
+  detailMs.value = 0
+}
+function detailMove(event) {
+  if (!detailActive) return
+  const touch = event.touches[0]
+  const dy = Math.max(0, touch.clientY - detailStartY)
+  const dx = (touch.clientX - detailStartX) * 0.25
+  const k = Math.min(1, dy / 240)
+  detailY.value = dy
+  detailX.value = dx * 0.3
+  detailSX.value = 1 - k * 0.32
+  detailSY.value = 1 - k * 0.32
+  detailOpacity.value = 1
+  const now = Date.now()
+  const dt = Math.max(8, now - detailLastT)
+  detailVelocity = (touch.clientY - detailLastY) / dt
+  detailLastY = touch.clientY; detailLastT = now
+}
+function detailEnd() {
+  if (!detailActive) return
+  detailActive = false
+  if (Date.now() - detailLastT > 120) detailVelocity = 0
+  // 轻点（没有拖动）不要进入回弹锁，否则会吞掉按钮的 click
+  if (Math.abs(detailY.value) < 2 && Math.abs(detailVelocity) < 0.1) { detailMs.value = 0; return }
+  if (detailY.value > 110 || detailVelocity > 0.65) { closeDetail(); return }
+  detailBusy.value = true
+  detailDuration(440)
+  detailEase.value = 'cubic-bezier(0.24,1.5,0.4,1)'
+  detailX.value = 0; detailY.value = 0; detailSX.value = 1; detailSY.value = 1
+  detailOpacity.value = 1
+  if (detailTimer != null) cancelLater(detailTimer)
+  detailTimer = later(() => { detailTimer = null; detailBusy.value = false; detailMs.value = 0 }, detailMs.value + 20)
+}
+async function saveConnection() {
+  refresh()
+  if (state.running || voice.active || mic.active) { toast('请先停止连接、通话和麦克风实验'); return }
+  saveButton.value = 'busy'
+  await nextTick()
+  try {
+    phone.saveConfig(form.address.trim(), form.password.trim(), form.fingerprint.trim())
+    Object.assign(form, JSON.parse(phone.readConfig())); refresh(); saveButton.value = 'success'
+  } catch (error) { saveButton.value = 'idle'; toast(errorText(error)) }
+}
+function connectionMessage(message) { connectionFeedback.value = message; toast(message) }
+function saveConnectionDraft() {
+  const saved = JSON.parse(phone.readConfig())
+  const address = form.address.trim(), password = form.password.trim(), fingerprint = form.fingerprint.trim()
+  if (state.configured && address === saved.address && password === saved.password && fingerprint === saved.fingerprint) return
+  phone.saveConfig(address, password, fingerprint)
+  Object.assign(form, JSON.parse(phone.readConfig()))
+  refresh()
+}
+function toggleConnection() {
+  if (starting || confirming) return
+  connectionFeedback.value = ''
+  refresh()
+  if (state.running) {
+    try { phone.stopConnection(); cancelHeroTransition(); connectButton.value = 'idle'; refresh() }
+    catch (error) { connectionMessage(errorText(error)) }
+    return
+  }
+  if (!form.address.trim()) {
+    connectionMessage('请填写服务器地址，例如 203.0.113.10:8443')
+    return
+  }
+  if (!form.password.trim()) {
+    connectionMessage('请填写连接密码')
+    return
+  }
+  try { saveConnectionDraft() }
+  catch (error) { connectionMessage(errorText(error)); return }
+  if (!state.configured) { connectionMessage('请先在连接设置中填写并保存服务器信息'); return }
+  if (!state.accessibility) { step.value = 1; connectionMessage('无障碍服务还没就绪。开启后回到 App，稍等片刻再点连接。'); return }
+  const revision = ++confirmationRevision
+  confirming = true
+  connectionFeedback.value = '请在弹窗中确认开始连接。'
+  try { uni.showModal({ title: '允许此服务器控制手机？', content: state.address + '\n连接期间可以查看界面、点击和输入。你可以随时停止。', confirmText: '开始连接',
+    success: result => {
+      if (revision !== confirmationRevision) return
+      confirming = false
+      if (!result.confirm || disposed || !visible.value) return
+      connectionFeedback.value = ''
+      starting = true; connectButton.value = 'busy'
+      runHeroTransition('connecting', () => {
+        try { phone.startConnection() }
+        catch (error) { cancelHeroTransition(); connectButton.value = 'idle'; connectionMessage(errorText(error)) }
+        finally {
+          starting = false
+          startTimer = later(() => { refresh(); if (!state.connected) connectButton.value = 'idle' }, 300)
+        }
+      })
+    }, fail: error => { if (revision !== confirmationRevision) return; confirming = false; connectionMessage(errorText(error)) },
+    complete: () => { if (revision === confirmationRevision) { confirming = false; if (connectionFeedback.value === '请在弹窗中确认开始连接。') connectionFeedback.value = '' } }
+  }) } catch (error) { confirming = false; connectionMessage(errorText(error)) }
+}
+function persistEffects() {
+  phone.savePreferences(!effects.transition, speed.value)
+  uni.setStorageSync('kira-ui-effects', { ...effects })
+}
+function updateEffects(next) {
+  const previous = { ...effects }
+  Object.assign(effects, next)
+  try { persistEffects() } catch (error) { Object.assign(effects, previous); toast(errorText(error)) }
+  if (previous.transition !== effects.transition) { startCta(); startStars() }
+}
+function setAllEffects() { updateEffects(toggleAll(effects)) }
+function toggleEffect(key) { updateEffects({ ...effects, [key]: !effects[key] }) }
+function openWheel() { if (preferenceTimer != null) cancelLater(preferenceTimer); wheelSettling.value = false; wheelDraft.value = speed.value; preferenceButton.value = 'idle'; wheel.value = true }
+function onWheelChange(index) { wheelDraft.value = index }
+function confirmSpeed() {
+  if (wheelSettling.value || preferenceButton.value === 'success') return
+  try {
+    phone.savePreferences(!effects.transition, wheelDraft.value); speed.value = wheelDraft.value; preferenceButton.value = 'success'
+    startCta(); startStars()
+    if (preferenceTimer != null) cancelLater(preferenceTimer)
+    preferenceTimer = later(() => { wheel.value = false; preferenceButton.value = 'idle' }, motion(900, 'feedback'))
+  } catch (error) { toast(errorText(error)) }
+}
+function copyDeviceId() { if (state.deviceId) uni.setClipboardData({ data: state.deviceId }); else toast('请在 Android App 中复制设备 ID') }
+function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-WebSocket 1.5.7 · MIT\nSLF4J 2.0.16 · MIT\n\n完整许可位于发行源码的 third-party 目录及 APK 内的 assets/licenses。界面使用 uni-app x。', showCancel: false }) }
+</script>
+
+<style>
+.scene {transition-property: transform; transition-timing-function: cubic-bezier(0.22,1.12,0.36,1); flex: 1; overflow: hidden;    background-color: #e9eef2; }
+.app {position: relative; flex: 1;    background-color: #e9eef2; }
+.sky {pointer-events: none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 0;  opacity: 0.16; }
+.star {transition-property: opacity; position: absolute; border-radius: 50%;   background-color: #8aa0b5; }
+.header {position: relative; z-index: 1;   flex-direction: row; align-items: center; transition-property: transform, opacity;  height: 68px; padding: 8px 20px 4px; }
+.menu-btn {width: 44px; height: 44px;   align-items: center; justify-content: center;  background-color: #f7f9fb; border-radius: 14px; }
+.menu-line {width: 16px; height: 2px; border-radius: 1px;     background-color: #45627c; margin-top: 3px; margin-bottom: 3px; }
+.menu-line-short { width: 10px; }
+.header-badge { width: 40px; height: 40px; border-radius: 12px; background-color: #14171a; align-items: center; justify-content: center; }
+.header-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+.header-copy { flex: 1; margin-left: 12px; flex-direction: column; }
+.header-title {font-weight: 600;   color: #29465f; font-size: 16px; }
+.header-sub {margin-top: 4px;  color: #63798c; font-size: 11px; }
+.status-chip {flex-direction: row; align-items: center;  border-radius: 999px;  border-style: solid; border-width: 1px;   background-color: #dde6ee; border-color: #d5e0e9; padding: 7px 10px; }
+.status-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #93aacb; margin-right: 8px; }
+.status-text {font-size: 11px;    color: #526c82; }
+.status-on {background-color: #d9e9e2; }
+.status-dot-on { background-color: #25c08a; }
+.status-text-on { color: #12805d; }
+
+.stage { position: relative; z-index: 1; flex: 1; overflow: hidden; flex-direction: column; transition-property: transform, opacity; }
+.page { flex: 1; }
+.page-content {padding: 14px 20px 28px; }
+.kicker {color: #698095; letter-spacing: 1px; font-size: 11px; margin-bottom: 5px; }
+.headline {font-weight: 600;    color: #233f58; font-size: 25px; line-height: 34px; }
+.small-headline {font-size: 24px; line-height: 33px; }
+.lede {color: #607588; font-size: 13px; line-height: 21px; margin-top: 6px; margin-bottom: 20px; }
+.muted {font-size: 14px; line-height: 21px;  color: #637588; }
+.small { font-size: 12px; line-height: 19px; }
+
+.hero-card { position: relative; overflow: hidden; padding: 24px; border-radius: 20px; background-color: #ffffff; border-style: solid; border-width: 1px; border-color: #dfe7f2; }
+.hero-accent { position: absolute; top: 0; left: 0; width: 44px; height: 3px; background-color: #1e63b4; }
+.hero-top { flex-direction: row; align-items: center; justify-content: space-between; margin-top: 4px; }
+.hero-eyebrow { font-size: 11px; color: #555c62; letter-spacing: 2px; }
+.pill { background-color: #eef4fd; border-radius: 999px; padding: 4px 11px; }
+.pill-text { font-size: 11px; color: #4d5358; letter-spacing: 0.5px; }
+.pill-on { background-color: #e3edfb; }
+.hero-title { color: #14171a; font-size: 26px; font-weight: 600; margin-top: 16px; line-height: 34px; }
+.hero-note { font-size: 14px; line-height: 21px; color: #555c62; margin-top: 8px; min-height: 20px; }
+.hero-meta { position: relative; flex-direction: row; align-items: center; padding-top: 16px; margin-top: 16px; }
+.meta-rule { position: absolute; top: 0; left: 0; right: 0; height: 1px; background-color: #e9eff9; }
+.meta-item { flex: 1; flex-direction: column; }
+.meta-label { font-size: 11px; color: #555c62; letter-spacing: 2px; }
+.meta-value { font-size: 14px; color: #2f3438; margin-top: 4px; }
+.meta-divider { width: 1px; height: 26px; background-color: #e9eff9; margin: 0 12px; }
+.hero-action { margin-top: 16px; }
+.cta-wrap { position: relative; border-radius: 30px; }
+.connection-feedback { font-size: 13px; line-height: 21px; color: #73513a; margin-top: 10px; }
+.cta-halo { pointer-events: none; position: absolute; left: -3px; right: -3px; top: -3px; bottom: -3px; border-radius: 33px; border-style: solid; border-width: 1px; border-color: rgba(124,196,255,0.45); background-color: rgba(124,196,255,0.10); }
+.hero-copy { transition-property: transform, opacity; }
+.sweep-track { height: 2px; border-radius: 1px; background-color: transparent; overflow: hidden; margin-bottom: 8px; }
+.sweep-fill { width: 100%; transform-origin: left center; height: 2px; border-radius: 1px; background-color: #1e63b4; }
+
+.drawer-scrim { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background-color: #14171a; z-index: 44; }
+.drawer {transition-property: transform; position: fixed; left: 0; top: 0; bottom: 0; width: 300px; z-index: 45; 
+  border-style: solid; border-width: 0 1px 0 0;  padding: 28px 18px 22px; flex-direction: column;  background-color: #edf2f6; border-color: #d7e1e9; }
+.drawer-head { flex-direction: row; align-items: center; }
+.drawer-badge { width: 40px; height: 40px; border-radius: 12px; background-color: #1e63b4; align-items: center; justify-content: center; margin-right: 12px; }
+.drawer-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+.drawer-title {font-weight: 600;   color: #29465f; font-size: 17px; }
+.drawer-sub {font-size: 11px;  margin-top: 4px;  color: #63798c; }
+.drawer-rule {height: 1px;  margin: 24px 0 14px;  background-color: #d5e0e9; }
+.drawer-body { flex: 1; }
+.drawer-item { flex-direction: row; align-items: center; height: 48px; padding: 0 12px; border-radius: 14px; margin-bottom: 8px; }
+.drawer-item-on {background-color: #dce7f0; }
+.drawer-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #93aacb; margin-right: 12px; }
+.drawer-dot-on {background-color: #567fa6; }
+.drawer-label {font-size: 14px;  flex: 1;  color: #526b81; }
+.drawer-label-on {font-weight: 600;  color: #294d70; }
+.drawer-note {font-size: 11px;  letter-spacing: 1px;  color: #62798d; }
+.shield-row {position: relative; flex-direction: row; align-items: center; padding: 12px; border-radius: 16px;  margin-bottom: 12px;  background-color: #dfe8f0; }
+.shield-copy { flex: 1; }
+.shield-title {font-size: 14px; font-weight: 600;   color: #30485e; }
+.shield-note {font-size: 11px;  margin-top: 4px;  color: #63798c; }
+.shield-note-off {color: #63798c; }
+.shield-switch { margin-left: 8px; min-width: 44px; min-height: 44px; }
+.switch { width: 44px; height: 26px; border-radius: 13px; background-color: #d2ddec; padding: 4px; }
+.switch-on { background-color: #12805d; }
+.switch-knob { width: 20px; height: 20px; border-radius: 10px; background-color: #ffffff; }
+.drawer-version {font-size: 11px;  letter-spacing: 1px;  color: #63798c; }
+
+.section-heading {flex-direction: row;  justify-content: space-between;  margin-top: 22px; margin-bottom: 10px; align-items: center; }
+.section-title {font-weight: 600;   color: #304c65; font-size: 16px; }
+.section-count {color: #61798d; font-size: 12px; }
+
+.timeline { flex-direction: row; margin-bottom: 16px; }
+.timeline-seg { flex: 1; padding-right: 8px; }
+.seg-track { height: 3px; border-radius: 2px; background-color: rgba(255,255,255,0.16); overflow: hidden; }
+.seg-fill { height: 3px; border-radius: 2px; background-color: #7cc4ff; transition-property: width; transition-timing-function: ease-out; }
+.seg-foot { flex-direction: row; align-items: center; margin-top: 8px; }
+.seg-node { width: 22px; height: 22px; border-radius: 11px; background-color: rgba(255,255,255,0.16); align-items: center; justify-content: center; transition-property: background-color; transition-duration: 260ms; }
+.seg-node-text { font-size: 11px; color: #c7d8f0; }
+.seg-node-text-on { color: #ffffff; }
+.seg-node-current { background-color: #2e7fd0; }
+.seg-node-done { background-color: #1fa97c; }
+.seg-label { font-size: 11px; color: #9db4d4; margin-left: 8px; }
+.seg-label-on { color: #ffffff; font-weight: 400; }
+.swipe-hint {font-size: 11px;  text-align: center;   color: #6b8092; line-height: 18px; margin-top: 8px; }
+
+.stack { position: relative; }
+.stack-card {position: absolute; left: 0; right: 0; height: 96px; border-radius: 18px; padding: 16px 18px; flex-direction: row; align-items: center; border-style: solid; border-width: 1px;  transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1);  border-color: #d5e0e9; }
+.stack-first {background-color: #f8fafb; }
+.stack-second {background-color: #f1f5f8; }
+.stack-third {background-color: #e3ebf2; }
+.stack-chip {width: 38px; height: 38px; border-radius: 12px;  align-items: center; justify-content: center;  background-color: #e3edf5; }
+.stack-glyph { font-size: 18px; color: #1e63b4; }
+.stack-copy { flex: 1; margin: 0 12px; }
+.stack-chev { font-size: 18px; color: #9aa4b2; transition-property: transform; transition-duration: 260ms; }
+.stack-chev-open { transform: rotate(90deg); }
+
+.detail-title {font-size: 15px; font-weight: 600; line-height: 23px;  color: #30485e; }
+.footnote {font-size: 12px;   margin-top: 20px;  color: #62798d; line-height: 20px; }
+
+.field-label { color: #c7d8f0; font-size: 14px; letter-spacing: 1px; margin-bottom: 8px; margin-top: 16px; }
+.input { background-color: #ffffff; border-style: solid; border-width: 1px; border-color: #dfe7f2; border-radius: 14px; padding: 16px 16px; color: #1c2023; font-size: 14px; min-height: 56px; }
+.field-note {font-size: 12px;  margin-top: 8px;  color: #62798d; line-height: 20px; }
+.fingerprint { height: 96px; width: 100%; }
+.text-link {font-size: 14px;   align-self: flex-end;  color: #42698e; margin-top: 8px; min-height: 28px; }
+.form-action { margin-top: 24px; }
+.divider {height: 1px;  margin: 24px 0;  background-color: #d3dfe8; }
+.compact { margin: 4px 0 6px; }
+.list-row { min-height: 66px; flex-direction: row; align-items: center; justify-content: space-between; }
+.card-link { color: #1e63b4; font-size: 14px; }
+
+.pref-hero {flex-direction: row; align-items: center;  border-radius: 20px;  border-style: solid; border-width: 1px; border-color: #dfe7f2; transition-property: background-color; transition-duration: 320ms;  background-color: #f7f9fb; padding: 18px 14px; }
+.pref-hero-0 {background-color: #f4f7f9; }
+.pref-hero-1 {background-color: #edf3f7; }
+.pref-hero-2 {background-color: #e5eef5; }
+.pref-hero-3 {background-color: #dce8f2; }
+.pref-copy { flex: 1; margin-left: 4px; }
+.pref-kicker { font-size: 11px; letter-spacing: 3px; color: #555c62; }
+.pref-title { font-size: 18px; font-weight: 600; color: #14171a; margin-top: 8px; }
+.pref-note { margin-top: 4px; }
+
+.preference-card {margin-top: 16px; padding: 8px 18px; border-radius: 18px; border-style: solid; border-width: 1px; border-color: #dfe7f2;   background-color: #f8fafb; }
+.check-row { min-height: 72px; flex-direction: row; align-items: center; }
+.child-row { margin-left: 4px; }
+.tickbox { width: 23px; height: 23px; border-radius: 7px; border-style: solid; border-width: 1.5px; border-color: #ccd9ea; align-items: center; justify-content: center; margin-right: 16px; background-color: #ffffff; }
+.tickbox-on { background-color: #1e63b4; border-color: #1e63b4; }
+.tick-mark { font-size: 14px; font-weight: 600; color: #ffffff; transition-property: transform,opacity; transition-duration: 180ms; }
+.row-copy { flex: 1; }
+.speed-row {margin-top: 16px; padding: 16px 18px; border-radius: 16px; border-style: solid; border-width: 1px; border-color: #dfe7f2;   background-color: #f8fafb; }
+.speed-value { flex-direction: row; align-items: center; }
+.speed-label { font-size: 14px; color: #1e63b4; font-weight: 400; }
+.speed-mult { font-size: 11px; color: #555c62; margin-left: 8px; }
+
+.about-brand { flex-direction: row; align-items: center; margin-bottom: 20px; }
+.about-version {font-size: 14px;   color: #63798c; margin-top: 5px; }
+.about-mark { width: 44px; height: 44px; border-radius: 13px; background-color: #14171a; align-items: center; justify-content: center; margin-right: 16px; }
+.about-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; }
+.about-card {border-radius: 18px;  border-style: solid; border-width: 1px; border-color: #dfe7f2; margin-bottom: 12px;  background-color: #f8fafb; padding: 20px; }
+.example { font-size: 14px; line-height: 25px; color: #1c2023; background-color: #f0f5fd; padding: 16px 16px; border-radius: 12px; margin: 12px 0 12px; }
+.paragraph { line-height: 23px; margin-top: 8px; }
+
+.tabbar { position: relative; z-index: 1; height: 64px; flex-direction: row; align-items: center; padding: 0 10px; background-color: #0a1a30; }
+.tabtop { position: absolute; top: 0; left: 0; right: 0; height: 1px; background-color: rgba(255,255,255,0.10); }
+.tab-pill { position: absolute; top: 6px; bottom: 6px; left: 10px; border-radius: 14px; background-color: rgba(255,255,255,0.12); transform-origin: center; transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1); }
+.tab { flex: 1; height: 100%; align-items: center; justify-content: center; z-index: 1; transition-property: transform; transition-duration: 140ms; transition-timing-function: cubic-bezier(0.3,0.8,0.4,1); }
+.shield-ripple { pointer-events: none; position: absolute; right: 2px; top: -4px; width: 72px; height: 72px; border-radius: 36px; border-style: solid; border-width: 2px; border-color: rgba(124,196,255,0.55); background-color: rgba(124,196,255,0.16); }
+.tab-icon { height: 20px; justify-content: center; align-items: center; }
+.tab-label { font-size: 11px; color: #93aacb; margin-top: 4px; letter-spacing: 0.5px; }
+.tab-label-on { color: #ffffff; font-weight: 600; }
+.ico-ink { border-color: #ffffff; }
+.ico-ink-bg { background-color: #ffffff; }
+.ico-i-on { color: #ffffff; }
+.ico-device { width: 11px; height: 16px; border-style: solid; border-width: 1.5px; border-color: #93aacb; border-radius: 3px; align-items: center; justify-content: flex-end; padding-bottom: 4px; }
+.ico-dot { width: 3px; height: 3px; border-radius: 2px; background-color: #93aacb; }
+.ico-sliders { width: 14px; }
+.ico-bar { height: 1.5px; border-radius: 1px; background-color: #555c62; margin: 4px 0; }
+.ico-bar-short { width: 8px; }
+.ico-ring { width: 14px; height: 14px; border-style: solid; border-width: 1.5px; border-color: #555c62; border-radius: 7px; align-items: center; justify-content: center; }
+.ico-ring-dot { width: 4px; height: 4px; border-radius: 2px; background-color: #93aacb; }
+.ico-info { width: 14px; height: 14px; border-style: solid; border-width: 1.5px; border-color: #555c62; border-radius: 7px; align-items: center; justify-content: center; }
+.ico-i { font-size: 11px; font-weight: 600; color: #555c62; line-height: 9px; }
+
+.transition-veil { pointer-events: none; position: fixed; z-index: 60; background-color: rgba(124,196,255,0.22); transition-property: transform, opacity; transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1); }
+.scrim { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background-color: rgba(16,20,18,0.42); z-index: 40; }
+.wheel-sheet { position: fixed; left: 0; right: 0; bottom: 0; border-top-left-radius: 24px; border-top-right-radius: 24px; background-color: #ffffff; padding: 12px 22px 24px; z-index: 43; }
+.sheet-handle { width: 34px; height: 4px; border-radius: 2px; background-color: #d8dcd6; align-self: center; margin-bottom: 16px; }
+.sheet-title { font-size: 18px; font-weight: 600; color: #14171a; text-align: center; }
+.sheet-sub { text-align: center; margin-top: 4px; margin-bottom: 4px; }
+.sheet-actions { margin-top: 8px; }
+.detail-veil { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(16,20,18,0.28); z-index: 70; }
+.detail-panel { position: fixed; z-index: 71; border-radius: 26px; background-color: #ffffff; padding: 0; overflow: hidden; border-style: solid; border-width: 1px; border-color: #e6e9e4; flex-direction: column; transition-property: transform, opacity; }
+.detail-top { flex-direction: row; align-items: center; justify-content: space-between; }
+.detail-kicker { font-size: 11px; letter-spacing: 2px; color: #555c62; }
+.detail-close { font-size: 14px; color: #555c62; padding: 4px 6px; min-width: 44px; min-height: 44px; text-align: center; }
+.detail-headline { margin-top: 16px; font-size: 26px; line-height: 34px; font-weight: 600; color: #14171a; }
+.detail-desc { margin-top: 8px; font-size: 14px; line-height: 21px; color: #555c62; }
+.detail-visual { flex: 1; align-items: center; justify-content: center; margin-top: 12px; }
+.detail-phone { width: 164px; height: 258px; border-radius: 26px; background-color: #14171a; padding: 8px; }
+.detail-screen { flex: 1; border-radius: 20px; background-color: #1e63b4; align-items: center; justify-content: center; }
+.detail-screen-mark { font-size: 26px; font-weight: 600; color: #eaf4ff; letter-spacing: 2px; }
+.detail-bar { width: 54px; height: 4px; border-radius: 2px; background-color: #9fc7f0; margin-top: 12px; }
+.detail-bar-short { width: 32px; margin-top: 8px; }
+.detail-note { font-size: 11px; color: #555c62; text-align: center; }
+.detail-cta { margin-top: 12px; height: 52px; border-radius: 16px; background-color: #14171a; align-items: center; justify-content: center; }
+.detail-cta-text { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
+.on-sky-title {color: #30485e; }
+.on-sky-note {color: #63798c; }
+.on-sky-link {color: #42698e; }
+</style>

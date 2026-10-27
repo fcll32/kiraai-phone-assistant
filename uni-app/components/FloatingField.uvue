@@ -1,0 +1,24 @@
+<template>
+  <view class="float-field" :class="disabled ? 'float-disabled' : ''">
+    <input v-if="!multiline" class="float-input" :aria-label="label" :value="modelValue" :password="password" :disabled="disabled" :maxlength="maxlength" @input="input" @focus="focused = true" @blur="focused = false" />
+    <textarea v-else class="float-input float-area" :aria-label="label" :value="modelValue" :disabled="disabled" :maxlength="maxlength" @input="input" @focus="focused = true" @blur="focused = false" />
+    <text class="float-label" :style="labelStyle">{{ label }}</text>
+    <view class="float-line" :style="{ transform: focused ? 'scaleX(1)' : 'scaleX(0)', transitionDuration: duration + 'ms' }" />
+  </view>
+</template>
+<script setup>
+import { ref, computed } from 'vue'
+const props = defineProps({ modelValue: { type: String, default: '' }, label: { type: String, default: '' }, password: { type: Boolean, default: false }, disabled: { type: Boolean, default: false }, multiline: { type: Boolean, default: false }, maxlength: { type: Number, default: 512 }, duration: { type: Number, default: 200 } })
+const emit = defineEmits(['update:modelValue', 'input'])
+const focused = ref(false)
+const labelStyle = computed(() => ({ transform: focused.value || props.modelValue.length > 0 ? 'translateY(-28px) scale(0.8)' : 'translateY(0px) scale(1)', color: focused.value ? '#3d648a' : '#63798c', transitionDuration: props.duration + 'ms' }))
+function input(event) { emit('update:modelValue', event.detail.value); emit('input') }
+</script>
+<style>
+.float-field {position: relative;  border: 1px solid #526581; border-radius: 14px;   background-color: #f8fafb; border-color: #bbcbd8; margin-top: 22px; }
+.float-input {height: 58px; padding: 16px;  font-size: 15px;  color: #29465f; }
+.float-area { height: 96px; width: 100%; }
+.float-label {position: absolute; left: 12px; top: 19px; padding: 0 5px;   transform-origin: left center; pointer-events: none; transition-property: transform,color; transition-timing-function: ease-out;  background-color: #f8fafb; font-size: 14px; }
+.float-line {position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px;  transition-property: transform; transition-timing-function: ease-out; pointer-events: none;  background-color: #527da4; }
+.float-disabled { opacity: 0.55; }
+</style>

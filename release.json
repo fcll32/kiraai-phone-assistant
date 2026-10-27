@@ -1,0 +1,10 @@
+{
+  "name": "KiraAI 手机助手",
+  "name_en": "KiraAI Phone Assistant",
+  "version": "1.0.0",
+  "version_code": 1,
+  "protocol": 1,
+  "plugin_id": "phone_control",
+  "application_id": "top.kira.phone",
+  "core_version": ">=3.0.1"
+}

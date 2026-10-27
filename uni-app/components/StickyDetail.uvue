@@ -1,0 +1,79 @@
+<template>
+  <view class="sticky-detail">
+    <scroll-view class="sticky-scroll" scroll-y :scroll-top="scrollTarget" @scroll="scroll" @touchstart="start" @touchmove="move" @touchend="end" @touchcancel="cancel">
+      <view class="sticky-hero">
+        <view class="sticky-art" :style="artStyle"><view class="sticky-orbit" /><view class="sticky-phone"><text class="sticky-ai">AI</text><view class="sticky-bar" /><view class="sticky-bar" /></view></view>
+        <view class="sticky-dark" :style="{ opacity: progress * 0.34 }" />
+      </view>
+      <view class="sticky-body" :style="{ minHeight: bodyHeight + 'px' }">
+        <text class="sticky-lead">{{ description }}</text>
+        <view v-for="(note, i) in notes" :key="i" class="sticky-note"><text class="sticky-number">0{{ i + 1 }}</text><view class="sticky-copy"><text class="sticky-note-title">{{ note.title }}</text><text class="sticky-text">{{ note.text }}</text></view></view>
+        <view class="sticky-action" role="button" @click="emit('action')"><text class="sticky-action-text">{{ action }}</text></view>
+        <text class="sticky-tip">控制期间可以随时停止。先连接手机，再让 AI 查看或操作。</text>
+      </view>
+    </scroll-view>
+    <view class="sticky-nav" :style="{ backgroundColor: 'rgba(243,248,255,' + (progress * 0.92) + ')' }"><text class="sticky-step" :style="{ opacity: 1 - progress }">连接准备 · 0{{ index + 1 }}</text><text class="sticky-close" :style="{ color: progress > 0.7 ? '#315e8e' : '#d4e7ff' }" role="button" aria-label="关闭详情" @click="emit('close')">关闭</text></view>
+    <text class="sticky-title" :style="titleStyle">{{ title }}</text>
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+const props = defineProps({ active: { type: Boolean, default: true }, title: { type: String, default: '' }, description: { type: String, default: '' }, action: { type: String, default: '去设置' }, index: { type: Number, default: 0 }, duration: { type: Number, default: 400 } })
+const emit = defineEmits(['close', 'action'])
+const bodyHeight = Math.max(620, uni.getWindowInfo().windowHeight - 100)
+const offset = ref(0), scrollTarget = ref(0), pull = ref(0)
+let snapTimer = null, spring = null, touching = false, y = 0, previous = 0, time = 0, velocity = 0
+const progress = computed(() => Math.min(1, Math.max(0, offset.value / 180)))
+const notes = computed(() => props.index === 0 ? [{ title: '填写地址', text: '填写公网 IP 和端口，例如 203.0.113.10:8443。App 会补全连接后缀。' }, { title: '复制连接信息', text: '从 KiraAI 的“手机连接”页面复制密码和服务器校验码，再保存。' }, { title: '允许手机连接', text: '服务器需要放行这个端口。使用 Docker 时，还要映射同一个端口。' }] : props.index === 1 ? [{ title: '打开系统设置', text: '找到“给 AI 一台手机”的无障碍服务，阅读说明并开启。' }, { title: '截图能力', text: 'Android 11 及以上支持按需截图；8–10 提供文字和按钮位置，不使用系统录屏。' }, { title: '你来决定', text: '仅允许的聊天可以操作手机。随时停止连接即可结束控制。' }] : [{ title: '开始连接', text: '回到设备页点“开始连接”，等待服务器认证成功。' }, { title: '在对话中试试', text: '对 Kira 说：“检查手机连接，然后打开设置。”模型会按需要调用手机工具。' }, { title: '也可以通话', text: '在通话页授权麦克风后，再点开始通话。需要服务器配置语音识别与语音合成。' }])
+const artStyle = computed(() => ({ transform: 'translateY(' + (offset.value * 0.5) + 'px) scale(' + (1 + pull.value / 500) + ')' }))
+const titleStyle = computed(() => ({ transform: 'translateY(' + (-progress.value * 172 + pull.value * 0.2) + 'px) scale(' + (1 - progress.value * 0.38) + ')', color: progress.value > 0.7 ? '#183b60' : '#ffffff' }))
+function clear() { if (snapTimer != null) clearTimeout(snapTimer); if (spring != null) clearInterval(spring); snapTimer = null; spring = null }
+function snap() {
+  if (touching || offset.value <= 0 || offset.value >= 180) return
+  const from = offset.value, to = Math.abs(velocity) > 0.15 ? (velocity > 0 ? 180 : 0) : (from > 90 ? 180 : 0), began = Date.now()
+  if (props.duration === 0) { scrollTarget.value = to; offset.value = to; return }
+  spring = setInterval(() => {
+    const p = Math.min(1, (Date.now() - began) / props.duration)
+    scrollTarget.value = Math.max(0, to + (from - to) * Math.exp(-7 * p) * Math.cos(4.5 * p))
+    if (p === 1) { clearInterval(spring); spring = null; scrollTarget.value = to }
+  }, 16)
+}
+function scroll(e) {
+  offset.value = Math.max(0, e.detail.scrollTop)
+  if (spring != null) return
+  const now = Date.now(); velocity = (offset.value - previous) / Math.max(8, now - time); previous = offset.value; time = now
+  if (snapTimer != null) clearTimeout(snapTimer)
+  if (!touching) snapTimer = setTimeout(snap, 120)
+}
+function start(e) { clear(); touching = true; y = e.touches[0].clientY; velocity = 0 }
+function move(e) { if (offset.value === 0) pull.value = Math.min(100, Math.max(0, (e.touches[0].clientY - y) * 0.35)) }
+function end() { touching = false; pull.value = 0; if (snapTimer != null) clearTimeout(snapTimer); snapTimer = setTimeout(snap, 120) }
+function cancel() { velocity = 0; end() }
+watch(() => props.active, () => { clear(); touching = false; velocity = 0; previous = 0; offset.value = 0; scrollTarget.value = 0; pull.value = 0 })
+onUnmounted(clear)
+</script>
+<style>
+.sticky-detail { flex: 1; position: relative; overflow: hidden; border-radius: 24px; background-color: #f3f8ff; }
+.sticky-scroll { flex: 1; }
+.sticky-hero { height: 280px; background-color: #204b79; overflow: hidden; }
+.sticky-art { height: 280px; align-items: center; padding-top: 50px; }
+.sticky-orbit { position: absolute; top: 58px; width: 230px; height: 110px; border: 1px solid #668db7; border-radius: 90px; transform: rotate(-18deg); }
+.sticky-phone { width: 70px; height: 108px; padding: 16px; border: 3px solid #b6d8fa; border-radius: 18px; transform: rotate(12deg); background-color: #36628f; }
+.sticky-ai { color: #ffffff; font-size: 24px; font-weight: 700; }
+.sticky-bar { height: 3px; background-color: #a8c7e6; margin-top: 9px; border-radius: 2px; }
+.sticky-dark { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #061426; }
+.sticky-body { padding: 26px 22px 60px; min-height: 620px; }
+.sticky-lead { font-size: 17px; line-height: 26px; color: #264a70; margin-bottom: 22px; }
+.sticky-note { flex-direction: row; margin-bottom: 28px; }
+.sticky-number { color: #5b86b5; font-size: 13px; margin-top: 3px; width: 30px; }
+.sticky-copy { flex: 1; }
+.sticky-note-title { font-size: 17px; font-weight: 600; color: #183b60; }
+.sticky-text { font-size: 14px; line-height: 23px; margin-top: 9px; color: #62758a; }
+.sticky-action { padding: 17px; border-radius: 16px; background-color: #235c96; align-items: center; }
+.sticky-action-text { font-size: 15px; color: #ffffff; font-weight: 600; }
+.sticky-tip { color: #6e8399; font-size: 12px; line-height: 21px; margin-top: 22px; }
+.sticky-nav { position: absolute; top: 0; left: 0; right: 0; height: 62px; padding: 20px; flex-direction: row; justify-content: space-between; }
+.sticky-step { font-size: 12px; color: #d4e7ff; }
+.sticky-close { color: #6b95c0; font-size: 14px; padding-left: 14px; }
+.sticky-title { position: absolute; top: 190px; left: 22px; right: 0; font-size: 27px; font-weight: 600; transform-origin: left top; pointer-events: none; }
+</style>

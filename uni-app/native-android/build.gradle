@@ -1,0 +1,13 @@
+buildscript {
+    def sdk = providers.gradleProperty('uniSdkDir').get()
+    dependencies {
+        classpath files("${sdk}/plugins/uts-kotlin-compiler-plugin-0.0.1.jar")
+        classpath files("${sdk}/plugins/uts-kotlin-gradle-plugin-0.0.1.jar")
+        classpath files("${sdk}/plugins/auto-register-gradle-plugin-1.0.0.jar")
+    }
+}
+plugins {
+    id 'com.android.application' version '9.0.1' apply false
+    id 'com.android.library' version '9.0.1' apply false
+    id 'com.google.devtools.ksp' version '2.3.11' apply false
+}

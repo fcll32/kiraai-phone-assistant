@@ -1,0 +1,88 @@
+plugins {
+    id 'com.android.application'
+    id 'io.dcloud.uts.kotlin'
+    id 'io.dcloud.uts.auto-register'
+}
+
+def sdk = providers.gradleProperty('uniSdkDir').get()
+def releaseInfo = new groovy.json.JsonSlurper().parse(file('../../../release.json'))
+def resourceRoot = file('../../unpackage/resources/app-android')
+def phoneModule = new File(resourceRoot, 'uni_modules/kira-phone/utssdk/app-android')
+if (!new File(resourceRoot, 'app-service.js').exists() || !new File(phoneModule, 'src/index.kt').exists()) {
+    throw new GradleException('Compile uni-app Android resources before building the APK.')
+}
+
+android {
+    namespace 'top.kira.phone'
+    compileSdk 36
+    defaultConfig {
+        applicationId releaseInfo.application_id
+        minSdk 26
+        targetSdk 35
+        versionCode releaseInfo.version_code
+        versionName releaseInfo.version
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main {
+        res.srcDir '../../../android-app/app/src/main/res'
+        assets.srcDir layout.buildDirectory.dir('uni-assets').get().asFile
+    }
+    androidResources {
+        noCompress 'uni-app-x-framework-vapor', 'uni-app-x-framework-vapor-dev', 'js'
+        // Android's default pattern drops folders starting with _, including the uni-app ID.
+        ignoreAssetsPattern '!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~'
+    }
+    packaging {
+        jniLibs { pickFirsts += ['**/libc++_shared.so']; useLegacyPackaging = false }
+    }
+}
+
+tasks.register('prepareUniAssets', Copy) {
+    from(resourceRoot) { exclude 'uni_modules/**', '.uniappx/**' }
+    into layout.buildDirectory.dir('uni-assets/apps/__UNI__KIRAPHONE/www')
+}
+tasks.named('preBuild').configure { dependsOn 'prepareUniAssets' }
+
+dependencies {
+    implementation project(':kira-phone')
+    implementation fileTree(dir: "${sdk}/SDK/libs", include: [
+        'app-common-release.aar', 'app-runtime-release.aar', 'breakpad-build-release.aar',
+        'uts-runtime-release.aar', 'ext-component-release.aar', 'uni-dialogPage-release.aar',
+        'uni-event-release.aar', 'uni-crash-release.aar', 'uni-getElementById-release.aar',
+        'uni-pullDownRefresh-release.aar', 'uni-uasm-release.aar', 'uni-storage-release.aar',
+        'uni-exit-release.aar', 'uni-theme-release.aar', 'uni-getAppBaseInfo-release.aar',
+        'uni-getDeviceInfo-release.aar', 'uni-getSystemInfo-release.aar',
+        'uni-getAccessibilityInfo-release.aar', 'uni-getAppAuthorizeSetting-release.aar',
+        'uni-getSystemSetting-release.aar', 'uni-openAppAuthorizeSetting-release.aar',
+        'uni-prompt-release.aar', 'uni-modal-release.aar', 'uni-rpx2px-release.aar', 'uni-secure-network-release.aar',
+        'uni-clipboard-release.aar', 'uni-form-release.aar', 'uni-swiper-release.aar'
+    ])
+    implementation 'androidx.tracing:tracing-ktx:1.3.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.exifinterface:exifinterface:1.3.6'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:2.2.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'com.facebook.fresco:fresco:3.4.0'
+    implementation 'com.facebook.fresco:animated-base:3.4.0'
+    implementation 'com.facebook.fresco:animated-gif:3.4.0'
+    implementation 'com.facebook.fresco:animated-webp:3.4.0'
+    implementation 'com.facebook.fresco:webpsupport:3.4.0'
+    implementation 'com.facebook.fresco:imagepipeline:3.4.0'
+    implementation 'com.facebook.fresco:drawee:3.4.0'
+    implementation 'com.facebook.fresco:middleware:3.4.0'
+    implementation 'com.caverock:androidsvg:1.4'
+    implementation 'com.alibaba:fastjson:1.2.83'
+    implementation 'com.github.getActivity:XXPermissions:18.63'
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.1'
+    implementation 'com.squareup.okhttp3:okhttp:3.12.12'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    implementation 'org.slf4j:slf4j-nop:2.0.16'
+}

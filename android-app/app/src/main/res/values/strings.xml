@@ -1,0 +1,3 @@
+<resources>
+    <string name="accessibility_description">允许你配置的 KiraAI 服务器按需查看界面、点击、滑动和输入文字。仅在你点击开始连接后工作；可在 App 或通知中随时停止。不录屏。Android 11+ 支持按需截图，Android 8–10 使用界面控件信息。</string>
+</resources>

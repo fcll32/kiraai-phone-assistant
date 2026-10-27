@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">KiraAI 手机助手</string>
+    <integer name="protocol_version">1</integer>
+</resources>

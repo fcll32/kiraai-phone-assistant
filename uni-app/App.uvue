@@ -1,0 +1,6 @@
+<script>
+export default { onLaunch() {} }
+</script>
+<style>
+page { background-color: #e9eef2; }
+</style>

@@ -1,0 +1,177 @@
+<template>
+  <view class="fb" role="button" :aria-label="ariaLabel" :aria-disabled="blocked ? 'true' : 'false'"
+    :style="{ transform: pressed && !blocked ? 'scale(0.985)' : 'scale(1)' }"
+    @touchstart.stop="onDown" @touchend.stop="onUp" @touchcancel.stop="onUp" @click.stop="press">
+    <view class="fb-surface" :class="(secondary ? 'fb-surface-secondary ' : '') + 'fb-surface-' + state" :style="surfaceStyle">
+      <view v-if="shine" class="fb-shine" :style="shineStyle" />
+      <text class="fb-label" :class="secondary ? 'fb-label-dark' : ''" :style="labelStyle">{{ currentLabel }}</text>
+      <view v-if="state === 'busy'" class="fb-dots">
+        <view v-for="n in 3" :key="n" class="fb-dot" :style="{ opacity: dotsPhase === n ? 1 : 0.3, transitionDuration: ms(220) + 'ms' }" />
+      </view>
+    </view>
+
+    <view v-if="state === 'success'" class="fb-circle" :style="circleStyle">
+      <view class="fb-check" :style="{ width: armLong ? '22px' : '0px', height: armShort ? '12px' : '0px', transitionDuration: ms(170) + 'ms' }" />
+    </view>
+
+    <view v-if="state === 'success' && !hideParticles" class="burst">
+      <view v-for="(p, i) in particles" :key="i" class="particle" :style="particleStyle(p)" />
+    </view>
+
+  </view>
+</template>
+
+<script setup>
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { animationDuration } from '@/lib/interactions.js'
+import { createTimeoutScope } from '@/lib/timers.js'
+const timeouts = createTimeoutScope(), shineTimeouts = createTimeoutScope()
+const props = defineProps({
+  label: { type: String, default: '保存' },
+  successText: { type: String, default: '已完成' },
+  busyText: { type: String, default: '请稍候' },
+  state: { type: String, default: 'idle' },
+  disabled: { type: Boolean, default: false },
+  secondary: { type: Boolean, default: false },
+  animated: { type: Boolean, default: true },
+  active: { type: Boolean, default: true },
+  shine: { type: Boolean, default: false },
+  speed: { type: Number, default: 1 }
+})
+function ms(base) { return animationDuration(base, props.speed, props.animated) }
+function shineDuration(base) { return animationDuration(base, props.speed, props.shine) }
+const emit = defineEmits(['press'])
+const pressed = ref(false), circleOn = ref(false), armShort = ref(false), armLong = ref(false)
+const burst = ref(false), hideParticles = ref(true), dotsPhase = ref(1)
+const shineX = ref(-60), shineOpacity = ref(0), shineMs = ref(0)
+const labelEntering = ref(false)
+const labelStyle = computed(() => ({
+  opacity: labelEntering.value ? 0 : 1,
+  transform: labelEntering.value ? 'translateY(8px)' : 'translateY(0px)',
+  transitionDuration: ms(240) + 'ms'
+}))
+let shineTimer = null, shineLoop = null
+const blocked = computed(() => props.disabled || props.state === 'busy')
+const currentLabel = computed(() => props.state === 'success' ? '' : props.state === 'busy' ? props.busyText : props.label)
+const ariaLabel = computed(() => props.state === 'success' ? props.successText : props.state === 'busy' ? props.busyText : props.label)
+const surfaceStyle = computed(() => ({
+  opacity: props.state === 'success' ? 0 : 1,
+  transform: props.state === 'success' ? 'scale(0.92)' : 'scale(1)',
+  transitionDuration: ms(180) + 'ms'
+}))
+const shineStyle = computed(() => ({
+  transform: 'translateX(' + shineX.value + 'px) rotate(18deg)',
+  opacity: shineOpacity.value,
+  transitionProperty: 'transform, opacity',
+  transitionDuration: shineMs.value + 'ms, ' + shineDuration(200) + 'ms',
+  transitionTimingFunction: 'ease-in-out'
+}))
+const circleStyle = computed(() => ({
+  transform: circleOn.value ? 'scale(1)' : 'scale(0.35)',
+  opacity: circleOn.value ? 1 : 0,
+  transitionDuration: ms(240) + 'ms'
+}))
+const palette = ['#1e63b4', '#3f7fd0', '#7cb8ef', '#a8d4ff', '#2e7fd0', '#5f7fa8', '#9fc7f0', '#124a86']
+const particles = [
+  { x: -38, y: -20, size: 7, color: palette[0], delay: 0 },
+  { x: -22, y: -36, size: 5, color: palette[2], delay: 30 },
+  { x: 6, y: -42, size: 6, color: palette[1], delay: 15 },
+  { x: 30, y: -28, size: 4, color: palette[3], delay: 45 },
+  { x: 40, y: -2, size: 6, color: palette[4], delay: 20 },
+  { x: 28, y: 24, size: 5, color: palette[5], delay: 50 },
+  { x: -12, y: 34, size: 4, color: palette[6], delay: 35 },
+  { x: -36, y: 14, size: 5, color: palette[7], delay: 10 }
+]
+function particleStyle(p) {
+  const moved = burst.value
+  return {
+    left: '50%', top: '30px', marginLeft: (-p.size / 2) + 'px', marginTop: (-p.size / 2) + 'px',
+    width: p.size + 'px', height: p.size + 'px', borderRadius: (p.size / 2) + 'px',
+    backgroundColor: p.color,
+    transform: moved ? 'translate(' + p.x + 'px,' + p.y + 'px) scale(1)' : 'translate(0px,0px) scale(0.2)',
+    opacity: hideParticles.value ? 0 : (moved ? 1 : 0),
+    transitionProperty: 'transform,opacity',
+    transitionDuration: ms(420) + 'ms',
+    transitionDelay: ms(p.delay + (moved ? 40 : 0)) + 'ms',
+    transitionTimingFunction: 'cubic-bezier(0.16,1,0.3,1)'
+  }
+}
+let dotsTimer = null, successTimer = null, particlesTimer = null
+function clearTimers() {
+  timeouts.clear()
+  if (dotsTimer != null) clearInterval(dotsTimer)
+  if (successTimer != null) clearTimeout(successTimer)
+  if (particlesTimer != null) clearTimeout(particlesTimer)
+  dotsTimer = null; successTimer = null; particlesTimer = null
+}
+function reset() {
+  circleOn.value = false; armShort.value = false; armLong.value = false
+  burst.value = false; hideParticles.value = true
+}
+function runSuccess() {
+  reset()
+  if (!props.animated) { circleOn.value = true; armShort.value = true; armLong.value = true; return }
+  successTimer = timeouts.after(() => {
+    circleOn.value = true
+    timeouts.after(() => { armShort.value = true }, ms(110))
+    timeouts.after(() => { armLong.value = true }, ms(190))
+    timeouts.after(() => { burst.value = true; hideParticles.value = false }, ms(150))
+    particlesTimer = timeouts.after(() => { hideParticles.value = true }, ms(720))
+  }, 20)
+}
+watch(() => [props.state, props.animated, props.active, props.speed], () => {
+  clearTimers()
+  reset()
+  labelEntering.value = false
+  if (!props.active) return
+  const state = props.state
+  if (state === 'success') runSuccess()
+  if (state === 'busy' && props.animated) {
+    labelEntering.value = true
+    timeouts.after(() => { labelEntering.value = false }, 20)
+    dotsPhase.value = 1
+    dotsTimer = setInterval(() => { dotsPhase.value = dotsPhase.value % 3 + 1 }, ms(320))
+  }
+}, { immediate: true })
+function stopShine() {
+  shineTimeouts.clear()
+  if (shineTimer != null) clearTimeout(shineTimer)
+  if (shineLoop != null) clearTimeout(shineLoop)
+  shineTimer = null; shineLoop = null
+  shineOpacity.value = 0
+}
+function shineOnce() {
+  if (!props.shine || !props.active) return
+  shineMs.value = 0; shineX.value = -60; shineOpacity.value = 0
+  nextTick(() => {
+    if (!props.shine || !props.active) return
+    shineTimer = shineTimeouts.after(() => {
+      shineMs.value = shineDuration(780); shineOpacity.value = 1; shineX.value = 400
+      shineLoop = shineTimeouts.after(() => { shineOpacity.value = 0 }, shineDuration(700))
+      shineTimer = shineTimeouts.after(shineOnce, shineDuration(3800))
+    }, 24)
+  })
+}
+function startShine() { stopShine(); if (props.shine && props.active) shineTimer = shineTimeouts.after(shineOnce, shineDuration(1200)) }
+watch(() => [props.shine, props.active, props.speed], () => { startShine() }, { immediate: true })
+function press() { if (!props.disabled && props.state !== 'busy') emit('press') }
+function onDown() { if (!blocked.value) pressed.value = true }
+function onUp() { pressed.value = false }
+onUnmounted(() => { clearTimers(); stopShine(); timeouts.dispose(); shineTimeouts.dispose() })
+</script>
+
+<style>
+.fb { position: relative; width: 100%; height: 60px; }
+.fb-surface {position: absolute; top: 0; right: 0; bottom: 0; left: 0;  overflow: hidden; flex-direction: row; align-items: center; justify-content: center;  transition-property: opacity,transform; transition-timing-function: ease-out;  background-color: #456b90; border-radius: 18px; }
+.fb-surface-secondary { background-color: #e8eef8; }
+.fb-shine { position: absolute; top: -24px; bottom: -24px; left: 0; width: 40px; background-color: rgba(255,255,255,0.2); }
+.fb-label {transition-property: transform,opacity; color: #ffffff;  font-weight: 600;   font-size: 16px; letter-spacing: 0.5px; }
+.fb-label-dark { color: #14171a; }
+.fb-dots { flex-direction: row; align-items: center; margin-left: 8px; }
+.fb-dot { width: 5px; height: 5px; border-radius: 3px; background-color: #ffffff; margin-left: 4px; transition-property: opacity; transition-duration: 220ms; }
+.fb-circle { position: absolute; left: 50%; top: 0; margin-left: -30px; width: 60px; height: 60px; border-radius: 30px; background-color: #12805d; transition-property: transform,opacity; transition-timing-function: cubic-bezier(0.2,0.9,0.3,1.1); }
+.fb-check { position: absolute; left: 25px; bottom: 22px; border-left-style: solid; border-left-width: 3px; border-left-color: #ffffff; border-bottom-style: solid; border-bottom-width: 3px; border-bottom-color: #ffffff; transform: rotate(-45deg); transform-origin: 0% 100%; transition-property: width,height; transition-duration: 170ms; transition-timing-function: ease-out; }
+.burst { position: absolute; left: 0; right: 0; top: 0; height: 60px; }
+.particle { position: absolute; }
+.fb-surface, .fb-circle, .burst { pointer-events: none; }
+</style>

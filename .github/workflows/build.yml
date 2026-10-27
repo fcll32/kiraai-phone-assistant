@@ -1,0 +1,62 @@
+name: Give AI a Phone - build and test
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.2.1'
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - run: python scripts/sync_release.py
+      - run: python scripts/test_android_gate.py
+      - run: python android-app/tests/run_runtime_regressions.py
+      - run: node --test scripts/test_ui_interactions.mjs scripts/test_ui_regressions.mjs
+      - run: python scripts/prepare_uni_tools.py
+      - run: python scripts/compile_uni.py --hbuilderx .runtime/uni-tools/HBuilderX
+      - shell: pwsh
+        run: |
+          $uniSdk = (Resolve-Path '.runtime/uni-tools/sdk/Android-uni-app-x-vapor-SDK@101163-5.26').Path.Replace('\', '/')
+          gradle --project-dir uni-app/native-android "-PuniSdkDir=$uniSdk" assembleDebug
+      - run: python scripts/verify_uni_apk.py uni-app/native-android/app/build/outputs/apk/debug/app-debug.apk
+      - run: python android-app/tests/run_socket_regressions.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Give-AI-a-Phone-APK
+          path: uni-app/native-android/app/build/outputs/apk/debug/*.apk
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: KiraAI-Dev/KiraAI
+          ref: dd8996909966b7f3737622cbf533c77bd2c9ff11 # v3.1.0
+          path: .kira
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r .kira/requirements.txt -r phone_control/requirements.txt pytest pytest-asyncio
+      - run: python scripts/sync_release.py
+      - run: python -m pytest phone_control/tests deploy/test_setup_public_ip.py scripts/test_release.py -q
+        env:
+          KIRAAI_ROOT: '${{ github.workspace }}/.kira'
+      - run: python scripts/package_plugin.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phone-control-plugin
+          path: dist/*/phone_control-*.zip

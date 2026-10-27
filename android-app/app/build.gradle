@@ -1,0 +1,19 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'top.kira.phone'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'top.kira.phone'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
+dependencies {
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    implementation 'org.slf4j:slf4j-nop:2.0.16'
+}

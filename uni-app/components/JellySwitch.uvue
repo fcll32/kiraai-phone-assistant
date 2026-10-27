@@ -1,0 +1,33 @@
+<template>
+  <view class="jelly" :style="trackStyle" role="switch" :aria-checked="checked" :aria-disabled="disabled" :aria-label="label" @click="request">
+    <view class="jelly-knob" :style="knobStyle" />
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+const props = defineProps({ checked: { type: Boolean, default: false }, disabled: { type: Boolean, default: false }, label: { type: String, default: '开关' }, duration: { type: Number, default: 350 } })
+const emit = defineEmits(['change'])
+const position = ref(props.checked ? 1 : 0), stretch = ref(0)
+let timer = null
+const trackStyle = computed(() => ({ backgroundColor: props.checked ? '#12805d' : '#a7adb6', opacity: props.disabled ? 0.5 : 1, transitionDuration: props.duration + 'ms' }))
+const knobStyle = computed(() => ({ transform: 'translateX(' + (position.value * 22) + 'px) scaleX(' + (1 + stretch.value * 0.45) + ') scaleY(' + (1 - stretch.value * 0.15) + ')' }))
+function stop() { if (timer != null) clearInterval(timer); timer = null }
+// The parent commits only the native-confirmed value. No optimistic protection state.
+function request() { if (!props.disabled) emit('change', { detail: { value: !props.checked } }) }
+watch(() => [props.checked, props.duration], () => {
+  stop()
+  const from = position.value, to = props.checked ? 1 : 0, start = Date.now()
+  if (props.duration === 0) { position.value = to; stretch.value = 0; return }
+  timer = setInterval(() => {
+    const p = Math.min(1, (Date.now() - start) / props.duration)
+    position.value = to + (from - to) * Math.exp(-6 * p) * Math.cos(6 * p)
+    stretch.value = Math.sin(Math.PI * p)
+    if (p === 1) { stop(); position.value = to; stretch.value = 0 }
+  }, 16)
+})
+onUnmounted(stop)
+</script>
+<style>
+.jelly { width: 54px; height: 32px; padding: 4px; border-radius: 18px; transition-property: background-color; flex-shrink: 0; }
+.jelly-knob { width: 24px; height: 24px; border-radius: 12px; background-color: #ffffff; }
+</style>

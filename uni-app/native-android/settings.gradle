@@ -1,0 +1,13 @@
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        flatDir { dirs("${providers.gradleProperty('uniSdkDir').get()}/plugins") }
+        google(); mavenCentral(); maven { url 'https://jitpack.io' }
+    }
+}
+rootProject.name = 'GiveAIAPhone'
+include ':app'
+include ':kira-phone'

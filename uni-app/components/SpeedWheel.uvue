@@ -1,0 +1,112 @@
+<template>
+  <view class="wheel" @touchstart.stop="onStart" @touchmove.stop="onMove" @touchend.stop="onEnd" @touchcancel.stop="onCancel">
+    <view class="wheel-band" />
+    <view class="wheel-strip" :style="{ transform: 'translateY(' + offset + 'px)' }">
+      <view v-for="(label, i) in slots" :key="i" class="wheel-row" role="button" :aria-label="label" @click="pick(i - 1)">
+        <text class="wheel-label" :class="i - 1 === activeIndex ? 'wheel-label-on' : ''">{{ label }}</text>
+        <text class="wheel-mult" :class="i - 1 === activeIndex ? 'wheel-mult-on' : ''">{{ multiplierAt(i - 1) }}</text>
+      </view>
+    </view>
+    <view class="wheel-tick-area">
+      <view v-for="n in 3" :key="n" class="wheel-tick" :class="n === 2 ? 'wheel-tick-on' : ''" />
+    </view>
+  </view>
+</template>
+
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+const props = defineProps({
+  value: { type: Number, default: 1 },
+  labels: { type: Array, default: () => ['轻快', '舒适', '从容'] },
+  multipliers: { type: Array, default: () => ['0.6×', '1.0×', '1.6×'] },
+  animated: { type: Boolean, default: true },
+  duration: { type: Number, default: 560 },
+  disabled: { type: Boolean, default: false }
+})
+const emit = defineEmits(['change', 'settling'])
+const row = 56
+const slots = computed(() => {
+  const list = ['']
+  const values = props.labels
+  for (let i = 0; i < values.length; i++) list.push('' + values[i])
+  list.push('')
+  return list
+})
+const offset = ref(-props.value * row)
+const activeIndex = computed(() => Math.max(0, Math.min(props.labels.length - 1, Math.round(-offset.value / row))))
+let timer = null, dragging = false, startY = 0, startOffset = 0, lastY = 0, lastTime = 0, velocity = 0
+let moved = false
+function multiplierAt(i) { return i >= 0 && i < props.multipliers.length ? props.multipliers[i] : '' }
+const minOffset = -(props.labels.length - 1) * row
+function clampIndex(i) { return Math.max(0, Math.min(props.labels.length - 1, i)) }
+function onStart(event) {
+  if (props.disabled) return
+  if (timer != null) { clearInterval(timer); timer = null }
+  const touch = event.touches[0]
+  dragging = true
+  moved = false
+  emit('settling', true)
+  startY = touch.clientY; lastY = startY; lastTime = Date.now()
+  startOffset = offset.value; velocity = 0
+}
+function onMove(event) {
+  if (!dragging) return
+  const touch = event.touches[0]
+  const y = touch.clientY
+  if (Math.abs(y - startY) > 6) moved = true
+  let next = startOffset + (y - startY)
+  if (next > 0) next = next * 0.35
+  if (next < minOffset) next = minOffset + (next - minOffset) * 0.35
+  const nearest = Math.round(-next / row)
+  const tick = -nearest * row
+  const gap = next - tick
+  // 磁吸：接近刻度时被吸过去，离得越远吸力越弱
+  if (Math.abs(gap) < 18) next = next - gap * 0.34
+  const now = Date.now()
+  if (now > lastTime) velocity = (y - lastY) / (now - lastTime)
+  lastY = y; lastTime = now
+  offset.value = next
+}
+function onEnd() {
+  if (!dragging) return
+  dragging = false
+  if (Date.now() - lastTime > 120) velocity = 0
+  const projected = offset.value + velocity * 190
+  const targetIndex = clampIndex(Math.round(-projected / row))
+  settle(targetIndex)
+}
+function settle(index) {
+  if (timer != null) { clearInterval(timer); timer = null }
+  const target = -index * row
+  const from = offset.value
+  if (!props.animated || props.duration === 0 || Math.abs(from - target) < 0.5) { offset.value = target; emit('change', index); emit('settling', false); return }
+  emit('settling', true)
+  const start = Date.now(), span = props.duration, distance = from - target
+  timer = setInterval(() => {
+    const progress = Math.min(1, (Date.now() - start) / span)
+    offset.value = target + distance * Math.exp(-5.4 * progress) * Math.cos(progress * Math.PI * 2.6)
+    if (progress >= 1) { clearInterval(timer); timer = null; offset.value = target; emit('change', index); emit('settling', false) }
+  }, 16)
+}
+function pick(index) {
+  if (props.disabled || moved || index < 0 || index >= props.labels.length) return
+  settle(index)
+}
+watch(() => props.value, value => { if (!dragging && timer == null) offset.value = -value * row })
+function onCancel() { moved = true; dragging = false; velocity = 0; settle(activeIndex.value) }
+onUnmounted(() => { if (timer != null) clearInterval(timer); emit('settling', false) })
+</script>
+
+<style>
+.wheel { position: relative; height: 168px; overflow: hidden; }
+.wheel-band { pointer-events: none; position: absolute; left: 0; right: 0; top: 56px; height: 56px; border-radius: 16px; background-color: #eef4fd; border-style: solid; border-width: 1px; border-color: #dbe6f4; }
+.wheel-strip { position: absolute; left: 0; right: 0; top: 0; flex-direction: column; }
+.wheel-row { flex-shrink: 0; height: 56px; flex-direction: row; align-items: center; justify-content: center; }
+.wheel-label { font-size: 14px; color: #555c62; }
+.wheel-label-on { font-size: 18px; color: #14171a; font-weight: 600; }
+.wheel-mult { margin-left: 8px; font-size: 11px; color: #555c62; }
+.wheel-mult-on { color: #1e63b4; }
+.wheel-tick-area { pointer-events: none; position: absolute; right: 14px; top: 56px; height: 56px; justify-content: space-between; }
+.wheel-tick { width: 10px; height: 2px; border-radius: 1px; background-color: #d5e1f2; }
+.wheel-tick-on { width: 16px; background-color: #1e63b4; }
+</style>

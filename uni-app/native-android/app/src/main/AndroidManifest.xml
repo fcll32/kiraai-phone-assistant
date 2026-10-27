@@ -1,0 +1,40 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
+        <package android:name="moe.shizuku.privileged.api" />
+        <package android:name="com.tencent.mobileqq" />
+        <package android:name="com.tencent.mm" />
+    </queries>
+    <application android:name="io.dcloud.uniappxv.UniApplication" android:allowBackup="false"
+        android:usesCleartextTraffic="false" android:icon="@mipmap/ic_launcher" android:label="@string/app_name"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar" tools:replace="android:allowBackup,android:usesCleartextTraffic">
+        <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false" android:enabled="true" android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <service android:name="top.kira.phone.VoiceCallService" android:exported="false" android:foregroundServiceType="microphone" />
+        <activity android:name="io.dcloud.uniappxv.UniAppActivity" android:exported="true"
+            android:configChanges="orientation|keyboardHidden|screenSize|mcc|mnc|fontScale|keyboard|smallestScreenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            tools:replace="android:exported,android:configChanges,android:windowSoftInputMode,android:theme">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+        <meta-data android:name="DCLOUD_UNI_APPID" android:value="__UNI__KIRAPHONE" />
+        <service android:name="top.kira.phone.PhoneAccessibility" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/kira_accessibility_service" />
+        </service>
+        <service android:name="top.kira.phone.ConnectionService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started remote phone control with a persistent connection and explicit stop action" />
+        </service>
+    </application>
+</manifest>

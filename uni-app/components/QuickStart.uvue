@@ -1,0 +1,67 @@
+<template>
+  <scroll-view class="guide" scroll-y>
+    <view class="guide-track">
+      <view v-for="(item, i) in steps" :key="i" class="guide-dot" :style="{ width: i === index ? '28px' : '8px', backgroundColor: i <= index ? '#527796' : '#dbe4ec', transitionDuration: duration + 'ms' }" />
+      <text class="guide-count">{{ index + 1 }} / 4</text>
+    </view>
+    <view class="guide-card" :style="cardStyle">
+      <text class="guide-kicker">{{ steps[index].tag }}</text>
+      <text class="guide-title">{{ steps[index].title }}</text>
+      <text class="guide-copy">{{ steps[index].body }}</text>
+      <text class="guide-note">{{ steps[index].note }}</text>
+    </view>
+    <FeedbackButton :label="actionLabel" :animated="animated" :speed="speed" :active="active" :disabled="busy" @press="act" />
+    <view class="guide-links">
+      <text class="guide-link" role="button" @click="back">{{ index > 0 ? '上一步' : '稍后再看' }}</text>
+      <text class="guide-link" role="button" @click="next">{{ index < 3 ? '下一步 ›' : '完成引导 ✓' }}</text>
+    </view>
+  </scroll-view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+import FeedbackButton from '@/components/FeedbackButton.uvue'
+import { createTimeoutScope } from '@/lib/timers.js'
+const props = defineProps({ duration: { type: Number, default: 400 }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 }, active: { type: Boolean, default: true }, configured: { type: Boolean, default: false }, accessibility: { type: Boolean, default: false }, connected: { type: Boolean, default: false } })
+const emit = defineEmits(['action', 'close'])
+const steps = [
+  { tag: '01 · 服务器', title: '先让服务器等你', body: '在 KiraAI 的“手机连接”页，填公网 IP、端口和允许的聊天，点击“保存并启动”。以后重启会自动恢复。', note: 'Docker 默认映射 8443 → 8443，不是管理网页的 5267。' },
+  { tag: '02 · 连接信息', title: '三项内容，一次填好', body: '复制服务器地址、连接密码和校验码，填入本 App 的连接设置并保存。', note: '地址只需 IP:端口。密码可自定义；校验码请完整复制，无需记住。' },
+  { tag: '03 · 手机权限', title: '让手机可以操作', body: '打开系统无障碍设置，找到 KiraAI 手机助手并开启服务，然后返回这里。', note: 'Android 11+ 可以截图；8–10 可读取界面文字和控制，不持续录屏。' },
+  { tag: '04 · 开始使用', title: '接下来，用对话操作', body: '回首页点“开始连接”，确认后等待“已连接”。再到允许的聊天说：“看看手机屏幕，并把截图发给我。”', note: '你可以随时在 App 或通知中停止。通话在“通话”页单独开启。' }
+]
+const index = ref(0), busy = ref(false), offset = ref(0), opacity = ref(1)
+const timeouts = createTimeoutScope()
+let target = 0
+const cardStyle = computed(() => ({ transform: 'translateX(' + offset.value + 'px) scale(' + (busy.value ? 0.98 : 1) + ')', opacity: opacity.value, transitionDuration: Math.round(props.duration / 2) + 'ms' }))
+const actionLabel = computed(() => index.value === 0 ? '服务器准备好了' : index.value === 1 ? (props.configured ? '已保存，继续 ✓' : '去填写连接信息') : index.value === 2 ? (props.accessibility ? '权限已开启，继续 ✓' : '打开无障碍设置') : (props.connected ? '已连接，回到首页 ✓' : '回首页开始连接'))
+function settle() { timeouts.clear(); index.value = target; busy.value = false; offset.value = 0; opacity.value = 1 }
+function go(value) {
+  if (busy.value || !props.active) return
+  target = Math.max(0, Math.min(3, value))
+  if (!props.duration) { settle(); return }
+  busy.value = true; offset.value = target > index.value ? -14 : 14; opacity.value = 0
+  timeouts.after(() => { index.value = target; offset.value = 0; opacity.value = 1; busy.value = false }, props.duration / 2)
+}
+function next() { if (busy.value || !props.active) return; if (index.value === 3) emit('close'); else go(index.value + 1) }
+function back() { if (busy.value || !props.active) return; if (index.value === 0) emit('close'); else go(index.value - 1) }
+function act() {
+  if (busy.value || !props.active) return
+  if (index.value === 0 || (index.value === 1 && props.configured) || (index.value === 2 && props.accessibility)) next()
+  else emit('action', index.value)
+}
+watch(() => [props.active, props.duration], settle)
+onUnmounted(() => timeouts.dispose())
+</script>
+<style>
+.guide { flex: 1; }
+.guide-track { flex-direction: row; align-items: center; margin-bottom: 14px; }
+.guide-dot { height: 8px; margin-right: 7px; border-radius: 6px; transition-property: width, background-color; }
+.guide-count { margin-left: auto; font-size: 12px; color: #718397; }
+.guide-card { background-color: #eef3f7; border-radius: 20px; padding: 20px; margin-bottom: 18px; transition-property: transform, opacity; transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+.guide-kicker { color: #527796; font-size: 12px; margin-bottom: 10px; }
+.guide-title { color: #18354d; font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+.guide-copy { color: #40576b; font-size: 15px; line-height: 24px; }
+.guide-note { color: #718397; font-size: 12px; line-height: 19px; margin-top: 14px; }
+.guide-links { flex-direction: row; justify-content: space-between; padding: 18px 4px 10px; }
+.guide-link { font-size: 14px; color: #527796; padding: 6px; }
+</style>
