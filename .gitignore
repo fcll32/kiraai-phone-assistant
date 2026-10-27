@@ -23,7 +23,6 @@ dev-guide/
 uni-app/unpackage/
 uni-app/node_modules/
 uni-app/.hbuilderx/
-uni-app/native-android/kira-phone/
 *.zip
 *.tar.gz
 

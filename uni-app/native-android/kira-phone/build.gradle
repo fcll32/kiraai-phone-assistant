@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.library'
+    id 'io.dcloud.uts.kotlin'
+    id 'io.dcloud.uts.auto-register'
+}
+def sdk = providers.gradleProperty('uniSdkDir').get()
+def sourceRoot = file('../../unpackage/resources/app-android/uni_modules/kira-phone/utssdk/app-android')
+android {
+    namespace 'uts.sdk.modules.kiraPhone'
+    compileSdk 36
+    defaultConfig { minSdk 26 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main {
+        manifest.srcFile new File(sourceRoot, 'AndroidManifest.xml')
+        java.srcDir new File(sourceRoot, 'src')
+        kotlin.directories.add(new File(sourceRoot, 'src').absolutePath)
+        res.srcDir new File(sourceRoot, 'res')
+        assets.srcDir new File(sourceRoot, 'assets')
+    }
+}
+dependencies {
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
+    compileOnly fileTree(dir: "${sdk}/SDK/libs", include: ['app-common-release.aar', 'app-runtime-release.aar', 'uts-runtime-release.aar'])
+    compileOnly 'com.alibaba:fastjson:1.2.83'
+    compileOnly 'androidx.core:core-ktx:1.10.1'
+    compileOnly 'org.jetbrains.kotlin:kotlin-reflect:2.2.0'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    implementation 'org.slf4j:slf4j-nop:2.0.16'
+}
