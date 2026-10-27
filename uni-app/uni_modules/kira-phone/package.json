@@ -1,0 +1,18 @@
+{
+  "id": "kira-phone",
+  "displayName": "Kira Phone Native",
+  "version": "1.0.0",
+  "description": "Android accessibility and user-started secure connection bridge",
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "client": {
+        "App": {
+          "app-android": "y",
+          "app-ios": "n"
+        }
+      }
+    }
+  }
+}

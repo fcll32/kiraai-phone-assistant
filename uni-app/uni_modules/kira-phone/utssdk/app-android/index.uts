@@ -1,0 +1,32 @@
+import { PhoneRuntime } from 'top.kira.phone'
+import { VoiceRuntime, VirtualMicRuntime } from 'top.kira.phone'
+import { UTSAndroid } from 'io.dcloud.uts'
+
+export function readState(): string { return PhoneRuntime.state(UTSAndroid.getAppContext()!) }
+export function readCallState(): string { return VoiceRuntime.state(UTSAndroid.getAppContext()!) }
+export function requestMicrophone(): void { VoiceRuntime.requestMicrophone(UTSAndroid.getUniActivity()!) }
+export function startCall(): void { VoiceRuntime.start(UTSAndroid.getUniActivity()!) }
+export function stopCall(): void { VoiceRuntime.stop(UTSAndroid.getAppContext()!) }
+export function setCallMuted(value: boolean): void { VoiceRuntime.mute(UTSAndroid.getAppContext()!, value) }
+export function setCallSpeaker(value: boolean): void { VoiceRuntime.speaker(UTSAndroid.getAppContext()!, value) }
+export function interruptCall(): void { VoiceRuntime.interrupt(UTSAndroid.getAppContext()!) }
+export function readVirtualMicState(): string { return VirtualMicRuntime.state(UTSAndroid.getAppContext()!) }
+export function authorizeVirtualMic(): void { VirtualMicRuntime.authorize(UTSAndroid.getUniActivity()!) }
+export function testVirtualMic(target: string): void { VirtualMicRuntime.test(UTSAndroid.getUniActivity()!, target) }
+export function stopVirtualMic(): void { VirtualMicRuntime.stop(UTSAndroid.getAppContext()!) }
+export function readConfig(): string { return PhoneRuntime.config(UTSAndroid.getAppContext()!) }
+export function saveConfig(address: string, password: string, fingerprint: string): void {
+  PhoneRuntime.save(UTSAndroid.getAppContext()!, address, password, fingerprint)
+}
+export function startConnection(): void { PhoneRuntime.start(UTSAndroid.getUniActivity()!) }
+export function stopConnection(): void { PhoneRuntime.stop(UTSAndroid.getAppContext()!) }
+export function openAccessibility(): void { PhoneRuntime.openAccessibility(UTSAndroid.getUniActivity()!) }
+export function prepare(): void { PhoneRuntime.prepare(UTSAndroid.getUniActivity()!) }
+export function secure(): void { PhoneRuntime.secure(UTSAndroid.getUniActivity()!) }
+export function setSecure(enabled: boolean): boolean { return PhoneRuntime.secure(UTSAndroid.getUniActivity()!, enabled) }
+export function savePreferences(reducedMotion: boolean, speed: number): void {
+  PhoneRuntime.preferences(UTSAndroid.getAppContext()!, reducedMotion, speed.toInt())
+}
+export function reveal(duration: number, x: number, y: number): void {
+  PhoneRuntime.reveal(UTSAndroid.getUniActivity()!, duration.toInt(), x.toInt(), y.toInt())
+}

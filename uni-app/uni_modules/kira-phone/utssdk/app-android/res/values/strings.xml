@@ -1,0 +1,3 @@
+<resources>
+    <string name="kira_accessibility_description">允许你配置的服务器按需查看界面、点击、滑动和输入文字。只有主动连接后才工作，可在 App 或通知中停止。不录屏。Android 11 及以上支持按需截图，Android 8–10 提供界面信息。</string>
+</resources>

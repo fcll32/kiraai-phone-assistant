@@ -1,0 +1,22 @@
+export type ReadState = () => string
+export type ReadCallState = () => string
+export type RequestMicrophone = () => void
+export type StartCall = () => void
+export type StopCall = () => void
+export type SetCallMuted = (value: boolean) => void
+export type SetCallSpeaker = (value: boolean) => void
+export type InterruptCall = () => void
+export type ReadVirtualMicState = () => string
+export type AuthorizeVirtualMic = () => void
+export type TestVirtualMic = (target: string) => void
+export type StopVirtualMic = () => void
+export type ReadConfig = () => string
+export type SaveConfig = (address: string, password: string, fingerprint: string) => void
+export type StartConnection = () => void
+export type StopConnection = () => void
+export type OpenAccessibility = () => void
+export type Prepare = () => void
+export type Secure = () => void
+export type SetSecure = (enabled: boolean) => boolean
+export type SavePreferences = (reducedMotion: boolean, speed: number) => void
+export type Reveal = (duration: number, x: number, y: number) => void

@@ -19,10 +19,11 @@ phone_control/config.json
 .compat/
 KiraAI/
 dev-guide/
-kira-phone/
+/kira-phone/
 uni-app/unpackage/
 uni-app/node_modules/
 uni-app/.hbuilderx/
+uni-app/native-android/kira-phone/
 *.zip
 *.tar.gz
 

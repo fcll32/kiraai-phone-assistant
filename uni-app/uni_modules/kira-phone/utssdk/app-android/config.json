@@ -1,0 +1,4 @@
+{
+  "minSdkVersion": 26,
+  "dependencies": ["org.java-websocket:Java-WebSocket:1.5.7", "org.slf4j:slf4j-nop:2.0.16", "dev.rikka.shizuku:api:13.1.5", "dev.rikka.shizuku:provider:13.1.5"]
+}
