@@ -66,6 +66,19 @@ App 内通话可以由服务器合成回复声音；普通聊天进度仍发送�
 """
 
 
+def _web_folder(plugin_root: Path | None = None) -> str:
+    """Return the page directory relative to the installed plugin root."""
+    package_dir = Path(__file__).resolve().parent
+    if plugin_root is None:
+        parent = package_dir.parent
+        plugin_root = parent if (parent / "main.py").is_file() and (parent / "manifest.json").is_file() else package_dir
+    try:
+        relative = (package_dir / "web").resolve().relative_to(Path(plugin_root).resolve())
+    except ValueError:
+        return "./web"
+    return f"./{relative.as_posix()}"
+
+
 @dataclass
 class Snapshot:
     sid: str
@@ -138,7 +151,8 @@ class PhoneControlPlugin(BasePlugin):
 
     @register.page("/connect", auth=True, menu=PageMenu(label={"zh": "手机连接", "en": "Phone connection"}, icon="Cellphone"))
     def connection_page(self):
-        return PluginPage.from_folder("./web")
+        plugin_root = self.ctx.plugin_mgr.get_plugin_module_path("phone_control") if self.ctx.plugin_mgr else None
+        return PluginPage.from_folder(_web_folder(plugin_root))
 
     @register.api("GET", "/setup", auth=True)
     async def connection_info(self):

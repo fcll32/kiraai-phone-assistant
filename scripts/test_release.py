@@ -43,10 +43,26 @@ def test_plugin_archive_has_required_modules_and_no_runtime_config(tmp_path):
         assert json.loads(archive.read("phone_control/manifest.json")) == json.loads((PLUGIN / "manifest.json").read_text(encoding="utf-8"))
 
 
+def test_repository_root_is_installable_plugin():
+    root = Path(__file__).parent.parent
+    plugin = root / "phone_control"
+    for name in ("manifest.json", "schema.json"):
+        assert json.loads((root / name).read_text(encoding="utf-8")) == json.loads(
+            (plugin / name).read_text(encoding="utf-8")
+        )
+    assert (root / "main.py").is_file()
+    assert (root / "requirements.txt").read_text(encoding="utf-8") == (
+        plugin / "requirements.txt"
+    ).read_text(encoding="utf-8")
+
+
 def test_source_distribution_excludes_builds_and_secrets():
     files = source_files()
     assert ".github/workflows/build.yml" in files
     assert "release.json" in files
+    assert "manifest.json" in files
+    assert "schema.json" in files
+    assert "main.py" in files
     assert "新手使用说明.md" in files
     assert "DEVELOPMENT.md" in files
     assert "phone_control/protocol.py" in files

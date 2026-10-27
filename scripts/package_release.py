@@ -12,7 +12,7 @@ from sync_release import synchronize
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_DIRS = ("phone_control", "android-app", "uni-app", "deploy", "scripts", "third-party", ".github")
-ROOT_FILES = ("README.md", "新手使用说明.md", "DEVELOPMENT.md", "VALIDATION.md", "CHANGELOG.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "CODE-REVIEW.md", "UI-OUTLINE.md", "INTERACTION-SPEC.md", "HANDOFF.md", "PLUGIN-VALIDATION.md", "VOICE-PLAN.md")
+ROOT_FILES = ("README.md", "新手使用说明.md", "DEVELOPMENT.md", "VALIDATION.md", "CHANGELOG.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "CODE-REVIEW.md", "UI-OUTLINE.md", "INTERACTION-SPEC.md", "HANDOFF.md", "PLUGIN-VALIDATION.md", "VOICE-PLAN.md", "manifest.json", "schema.json", "main.py", "requirements.txt")
 
 
 def source_files():
