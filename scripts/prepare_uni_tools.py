@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import os
 from pathlib import Path
+import time
 import urllib.request
 import zipfile
 
@@ -22,15 +23,52 @@ PLUGINS = [
 ]
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def download_archive(name, url, digest):
+    """Download with bounded retries; never accept a truncated or stale archive."""
+    archive = ROOT / (name + ".zip")
+    if archive.exists() and sha256_file(archive) == digest:
+        return archive
+    archive.unlink(missing_ok=True)
+    partial = archive.with_name(archive.name + ".part")
+    last_error = None
+    for attempt in range(3):
+        partial.unlink(missing_ok=True)
+        try:
+            with urllib.request.urlopen(url, timeout=180) as response:
+                expected = response.headers.get("Content-Length")
+                received = 0
+                with partial.open("wb") as target:
+                    while chunk := response.read(1024 * 1024):
+                        target.write(chunk)
+                        received += len(chunk)
+                    target.flush()
+                    os.fsync(target.fileno())
+            if expected is not None and received != int(expected):
+                raise ValueError(f"Truncated download: received {received} of {expected} bytes")
+            actual = sha256_file(partial)
+            if actual != digest:
+                raise ValueError(f"Checksum mismatch: expected {digest}, received {actual}")
+            partial.replace(archive)
+            return archive
+        except Exception as exc:
+            last_error = exc
+            partial.unlink(missing_ok=True)
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"Failed to download {url} after 3 attempts: {last_error}") from last_error
+
+
 def install(item):
     name, url, digest, directory = item
-    archive = ROOT / (name + ".zip")
-    if not archive.exists():
-        with urllib.request.urlopen(url, timeout=120) as response, archive.open("wb") as target:
-            while chunk := response.read(1024 * 1024):
-                target.write(chunk)
-    if hashlib.sha256(archive.read_bytes()).hexdigest() != digest:
-        raise ValueError(f"Checksum mismatch: {archive}; remove this incomplete download and retry.")
+    archive = download_archive(name, url, digest)
     marker = ROOT / (name + ".verified")
     if marker.exists() and marker.read_text() == digest:
         return
