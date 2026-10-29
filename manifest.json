@@ -1,7 +1,8 @@
 {
   "plugin_id": "phone_control",
+  "icon": "icon.png",
   "display_name": "KiraAI Phone Assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "core_version": ">=3.0.1",
   "author": "fcll",
   "description": "Android accessibility control over phone-initiated WSS, screenshots and on-demand chat progress.",

@@ -1,24 +1,47 @@
 <template>
-  <view class="float-field" :class="disabled ? 'float-disabled' : ''">
-    <input v-if="!multiline" class="float-input" :aria-label="label" :value="modelValue" :password="password" :disabled="disabled" :maxlength="maxlength" @input="input" @focus="focused = true" @blur="focused = false" />
-    <textarea v-else class="float-input float-area" :aria-label="label" :value="modelValue" :disabled="disabled" :maxlength="maxlength" @input="input" @focus="focused = true" @blur="focused = false" />
+  <view class="float-wrap">
+  <view class="float-field" :class="disabled ? 'float-disabled' : ''" :style="fieldStyle">
+    <input v-if="!multiline" class="float-input" :aria-label="label" :value="modelValue" :password="password" :disabled="disabled" :maxlength="maxlength" :focus="requestFocus" :selection-start="selectionStart" :selection-end="selectionEnd" @input="input" @focus="focused = true" @blur="focused = false" />
+    <textarea v-else class="float-input float-area" :aria-label="label" :value="modelValue" :disabled="disabled" :maxlength="maxlength" :focus="requestFocus" @input="input" @focus="focused = true" @blur="focused = false" />
     <text class="float-label" :style="labelStyle">{{ label }}</text>
-    <view class="float-line" :style="{ transform: focused ? 'scaleX(1)' : 'scaleX(0)', transitionDuration: duration + 'ms' }" />
+    <view class="float-line" :style="{ transform: focused || error ? 'scaleX(1)' : 'scaleX(0)', backgroundColor: error ? '#bd5e61' : '#527da4', transitionDuration: duration + 'ms' }" />
+  </view>
+  <text v-if="error" class="float-error" role="alert">{{ error }}</text>
   </view>
 </template>
 <script setup>
-import { ref, computed } from 'vue'
-const props = defineProps({ modelValue: { type: String, default: '' }, label: { type: String, default: '' }, password: { type: Boolean, default: false }, disabled: { type: Boolean, default: false }, multiline: { type: Boolean, default: false }, maxlength: { type: Number, default: 512 }, duration: { type: Number, default: 200 } })
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { createTimeoutScope } from '@/lib/timers.js'
+const props = defineProps({ modelValue: { type: String, default: '' }, label: { type: String, default: '' }, password: { type: Boolean, default: false }, disabled: { type: Boolean, default: false }, multiline: { type: Boolean, default: false }, maxlength: { type: Number, default: 512 }, duration: { type: Number, default: 200 }, error: { type: String, default: '' }, errorRevision: { type: Number, default: 0 }, active: { type: Boolean, default: true }, selectOnError: { type: Boolean, default: false } })
 const emit = defineEmits(['update:modelValue', 'input'])
 const focused = ref(false)
-const labelStyle = computed(() => ({ transform: focused.value || props.modelValue.length > 0 ? 'translateY(-28px) scale(0.8)' : 'translateY(0px) scale(1)', color: focused.value ? '#3d648a' : '#63798c', transitionDuration: props.duration + 'ms' }))
-function input(event) { emit('update:modelValue', event.detail.value); emit('input') }
+const shakeX = ref(0), requestFocus = ref(false), selectionStart = ref(-1), selectionEnd = ref(-1)
+const timers = createTimeoutScope()
+let disposed = false
+const fieldStyle = computed(() => ({ transform: 'translateX(' + shakeX.value + 'px)', borderColor: props.error ? '#bd5e61' : focused.value ? '#5688dd' : '#becfef', transitionDuration: props.duration ? Math.max(24, props.duration / 3) + 'ms' : '0ms' }))
+const labelStyle = computed(() => ({ transform: focused.value || props.modelValue.length > 0 ? 'translateY(-28px) scale(0.8)' : 'translateY(0px) scale(1)', color: props.error ? '#bd5e61' : focused.value ? '#3d70ca' : '#5a7096', transitionDuration: props.duration + 'ms' }))
+function focusError() { if (disposed || !props.active || props.disabled) return; if (props.selectOnError) { selectionStart.value = 0; selectionEnd.value = props.modelValue.length }; requestFocus.value = false; nextTick(() => { if (!disposed && props.active && !props.disabled && props.error) requestFocus.value = true }) }
+function reset(keepFocus = false) { timers.clear(); shakeX.value = 0; if (!keepFocus) requestFocus.value = false; selectionStart.value = -1; selectionEnd.value = -1 }
+function errorFeedback() {
+  if (!props.error) { reset(true); return }
+  reset(); if (!props.active || props.disabled) return
+  if (!props.duration) { focusError(); return }
+  const duration = props.duration * 2, offsets = [-10, 10, -6, 6, -3, 3, 0]
+  offsets.forEach((value, i) => timers.after(() => { shakeX.value = value }, duration * i / offsets.length))
+  timers.after(focusError, duration)
+}
+function input(event) { reset(true); emit('update:modelValue', event.detail.value); emit('input') }
+watch(() => [props.error, props.errorRevision], errorFeedback, { immediate: true })
+watch(() => [props.active, props.duration, props.disabled], () => { if (!props.active || props.disabled) reset(); else if (!props.duration) { reset(); if (props.error) focusError() } })
+onUnmounted(() => { disposed = true; timers.dispose() })
 </script>
 <style>
-.float-field {position: relative;  border: 1px solid #526581; border-radius: 14px;   background-color: #f8fafb; border-color: #bbcbd8; margin-top: 22px; }
-.float-input {height: 58px; padding: 16px;  font-size: 15px;  color: #29465f; }
+.float-wrap { overflow: visible; }
+.float-field { position: relative; overflow: visible; border: 1px solid #526581; border-radius: 18px; background-color: #f5f9ff; border-color: #b9cdef; margin-top: 24px; transition-property: transform,border-color; transition-timing-function: ease-out; }
+.float-input { height: 58px; padding: 16px; font-size: 15px; color: #243e6f; }
 .float-area { height: 96px; width: 100%; }
-.float-label {position: absolute; left: 12px; top: 19px; padding: 0 5px;   transform-origin: left center; pointer-events: none; transition-property: transform,color; transition-timing-function: ease-out;  background-color: #f8fafb; font-size: 14px; }
-.float-line {position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px;  transition-property: transform; transition-timing-function: ease-out; pointer-events: none;  background-color: #527da4; }
+.float-label { position: absolute; left: 12px; top: 19px; padding: 0 5px; transform-origin: left center; pointer-events: none; transition-property: transform,color; transition-timing-function: ease-out; background-color: #f5f9ff; font-size: 14px; }
+.float-line { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; transition-property: transform; transition-timing-function: ease-out; pointer-events: none; background-color: #5a8fe4; }
 .float-disabled { opacity: 0.55; }
+.float-error { color: #b15960; font-size: 12px; line-height: 19px; margin-top: 8px; }
 </style>

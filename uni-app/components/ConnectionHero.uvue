@@ -1,40 +1,47 @@
 <template>
   <view class="connection-hero">
-    <view class="hero-flipper" :style="flipStyle">
+    <GlassSurface :radius="34" :sdk="sdk" :active="active" :blurred="!busy && swipeX === 0" />
+    <view class="hero-flipper" :style="flipStyle" @touchstart.stop="swipeStart" @touchmove.stop="swipeMove" @touchend.stop="swipeEnd" @touchcancel.stop="swipeCancel">
       <view v-show="!back" class="hero-face">
         <view class="hero-heading"><text class="hero-kicker">手机连接</text><view class="hero-status" :class="connected ? 'hero-online' : ''"><view class="hero-dot" /><text class="hero-status-text">{{ connected ? '已就绪' : running ? '连接中' : '待连接' }}</text></view></view>
-        <view class="hero-main"><view :style="copyStyle" class="hero-message"><text class="hero-title">{{ title }}</text><text class="hero-note">{{ note }}</text></view><view class="hero-visual" aria-hidden="true"><view class="hero-orbit" /><view class="hero-orbit hero-orbit-small" /><view class="hero-phone"><view class="hero-camera" /><text class="hero-ai">AI</text><view class="hero-line" /><view class="hero-line hero-line-short" /></view><view class="hero-signal"><text class="hero-signal-text">{{ connected ? '✓' : '↗' }}</text></view></view></view>
-        <view class="hero-preview"><text class="hero-preview-label">连接到</text><text class="hero-preview-value" :lines="1">{{ address || '你的 Kira 服务器' }}</text></view>
+        <view class="hero-main"><view :style="copyStyle" class="hero-message"><LinkedText :value="title" :duration="duration * 700 / 480" :active="active" weight="600" /><view class="hero-note-space"><LinkedText :value="note" :font-size="13" :line-height="21" :lines="2" color="#4d6790" :duration="duration * 700 / 480" :active="active" /></view></view><view class="hero-visual" aria-hidden="true"><view class="hero-orbit" /><view class="hero-orbit hero-orbit-small" /><view class="hero-phone"><view class="hero-camera" /><text class="hero-ai">AI</text><view class="hero-line" /><view class="hero-line hero-line-short" /></view><view class="hero-signal"><text class="hero-signal-text">{{ connected ? '✓' : '↗' }}</text></view></view></view>
+        <view class="hero-preview"><text class="hero-preview-label">连接到</text><view class="hero-preview-line"><LinkedText :value="address || '你的 Kira 服务器'" :font-size="13" :line-height="20" color="#305b9d" :duration="duration * 700 / 480" :active="active" /></view></view>
       </view>
       <view v-show="back" class="hero-face hero-back">
         <text class="hero-kicker">连接概览</text><text class="hero-back-title">连接信息</text>
         <view class="hero-info"><text class="hero-label">服务器</text><text class="hero-value" :lines="1">{{ address || '还没有填写地址' }}</text></view>
         <view class="hero-info"><text class="hero-label">设备</text><text class="hero-value" :lines="1">{{ device }}</text></view>
-        <view class="hero-checks"><view v-for="(label, i) in ['连接信息', '无障碍', '已连接']" :key="i" class="hero-check"><text class="hero-check-dot" :class="checks[i] ? 'hero-check-done' : ''">{{ checks[i] ? '✓' : '·' }}</text><text class="hero-check-text">{{ label }}</text></view></view>
+        <view class="hero-checks"><view v-for="(label, i) in ['连接信息', '无障碍', '已连接']" :key="i" class="hero-check" role="button" :aria-label="label + (checks[i] ? '，已完成' : '，待补齐')" @click.stop="setup(i)"><text class="hero-check-dot" :class="checks[i] ? 'hero-check-done' : 'hero-check-empty'">{{ checks[i] ? '✓' : '+' }}</text><text class="hero-check-text">{{ label }}</text></view></view>
         <text class="hero-back-note">由你开启，随时可以停止。</text>
       </view>
     </view>
-    <view class="hero-flip-row" role="button" :aria-label="back ? '翻回连接状态' : '翻看连接概览'" :aria-disabled="busy" @click="flip"><text class="hero-flip-label">{{ back ? '返回连接状态' : '翻看连接概览' }}</text><text class="hero-flip-icon">↻</text></view>
+    <view class="hero-flip-row" role="button" :aria-label="back ? '翻回连接状态' : '翻看连接概览'" :aria-disabled="busy" @click="flip"><text class="hero-flip-label">{{ swipeHint || (back ? '右滑或轻点，返回连接状态' : '左滑或轻点，查看连接概览') }}</text><text class="hero-flip-icon">↻</text></view>
     <view class="hero-bottom"><slot /></view>
   </view>
 </template>
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { createTimeoutScope } from '@/lib/timers.js'
-const props = defineProps({ title: { type: String, default: '' }, note: { type: String, default: '' }, address: { type: String, default: '' }, device: { type: String, default: 'Android 手机' }, connected: { type: Boolean, default: false }, running: { type: Boolean, default: false }, checks: { type: Array, default: () => [] }, copyStyle: { type: Object, default: () => ({}) }, duration: { type: Number, default: 480 }, active: { type: Boolean, default: true } })
+import GlassSurface from '@/components/GlassSurface.uvue'
+import LinkedText from '@/components/LinkedText.uvue'
+const props = defineProps({ title: { type: String, default: '' }, note: { type: String, default: '' }, address: { type: String, default: '' }, device: { type: String, default: 'Android 手机' }, connected: { type: Boolean, default: false }, running: { type: Boolean, default: false }, checks: { type: Array, default: () => [] }, copyStyle: { type: Object, default: () => ({}) }, duration: { type: Number, default: 480 }, active: { type: Boolean, default: true }, sdk: { type: Number, default: 30 } })
 const timeouts = createTimeoutScope()
+const emit = defineEmits(['setup'])
 const back = ref(false), busy = ref(false), angle = ref(0), phaseMs = ref(0), lift = ref(false)
+const swipeX = ref(0), swipeHint = ref(''), bounceMs = ref(0)
 let target = false
+let dragging = false, axis = 0, startX = 0, startY = 0, delta = 0, moved = false
 const flipStyle = computed(() => {
   let perspective = ''
   // #ifdef H5
   perspective = 'perspective(900px) '
   // #endif
-  return { transform: perspective + 'translateY(' + (lift.value ? -4 : 0) + 'px) rotateY(' + angle.value + 'deg) scale(' + (lift.value ? 1.015 : 1) + ')', transitionDuration: phaseMs.value + 'ms' }
+  return { transform: perspective + 'translateX(' + swipeX.value + 'px) translateY(' + (lift.value ? -4 : 0) + 'px) rotateY(' + angle.value + 'deg) scale(' + (lift.value ? 1.015 : 1) + ')', transitionDuration: (dragging ? 0 : busy.value ? phaseMs.value : bounceMs.value) + 'ms' }
 })
-function finish() { timeouts.clear(); back.value = target; angle.value = 0; lift.value = false; phaseMs.value = 0; busy.value = false }
+function finish() { timeouts.clear(); back.value = target; angle.value = 0; lift.value = false; phaseMs.value = 0; busy.value = false; dragging = false; swipeX.value = 0; swipeHint.value = ''; bounceMs.value = 0 }
 function flip() {
   if (busy.value || !props.active) return
+  timeouts.clear(); swipeHint.value = ''; swipeX.value = 0; dragging = false
   target = !back.value
   if (props.duration === 0) { finish(); return }
   busy.value = true
@@ -50,48 +57,69 @@ function flip() {
     }, 20)
   }, half)
 }
+function swipeStart(e) { if (busy.value || !props.active) return; dragging = true; axis = 0; delta = 0; moved = false; bounceMs.value = 0; startX = e.touches[0].clientX; startY = e.touches[0].clientY }
+function swipeMove(e) {
+  if (!dragging) return
+  const dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY
+  if (!axis && Math.max(Math.abs(dx), Math.abs(dy)) > 6) axis = Math.abs(dx) > Math.abs(dy) ? 1 : 2
+  if (axis) moved = true
+  if (axis !== 1) return
+  delta = dx; swipeX.value = Math.max(-18, Math.min(18, dx * .18))
+}
+function swipeEnd() {
+  if (!dragging) return
+  dragging = false
+  if (axis === 1 && Math.abs(delta) > 44 && (delta < 0) !== back.value) { flip(); return }
+  bounceMs.value = props.duration; swipeX.value = 0
+  if (axis === 1 && Math.abs(delta) > 44) { swipeHint.value = back.value ? '已经是概览，向右滑返回' : '已经是连接状态，向左滑看概览'; timeouts.after(() => { swipeHint.value = '' }, 1600) }
+}
+function swipeCancel() { dragging = false; moved = true; bounceMs.value = props.duration; swipeX.value = 0 }
+function setup(index) { if (!busy.value && !moved && props.active) emit('setup', index) }
 watch(() => [props.active, props.duration], () => { if (!props.active || props.duration === 0) finish() })
 onUnmounted(() => timeouts.dispose())
 </script>
 <style>
-.connection-hero {overflow: hidden; border: 1px solid #d8e6f6;  background-color: #f8fafb; border-color: #d4e0ea; border-radius: 22px; }
+.connection-hero { position: relative; overflow: hidden; border-radius: 34px; box-shadow: 0 10px 32px rgba(50,75,156,0.16); }
 .hero-flipper {transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.32,1);  height: 204px; }
-.hero-face {position: absolute; top: 0; left: 0; right: 0; bottom: 0;   padding: 18px 20px 0; }
+.hero-face { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 18px 20px 0; }
 .hero-heading { flex-direction: row; align-items: center; justify-content: space-between; }
-.hero-kicker { font-size: 12px; line-height: 20px; color: #58718e; }
-.hero-status { flex-direction: row; align-items: center; padding: 4px 9px; border-radius: 20px; background-color: #e3edf9; }
+.hero-kicker { font-size: 12px; line-height: 20px; color: #42649c; font-weight: 600; }
+.hero-status { flex-direction: row; align-items: center; padding: 4px 9px; border-radius: 20px; background-color: #deebff; border: 1px solid rgba(255,255,255,0.68); }
 .hero-dot { width: 5px; height: 5px; border-radius: 3px; background-color: #6e90b5; margin-right: 6px; }
 .hero-online { background-color: #dcefe7; }
-.hero-status-text { font-size: 11px; color: #335776; }
-.hero-visual {align-items: center; justify-content: center;  width: 82px; height: 100px; flex-shrink: 0; margin-left: 12px; }
-.hero-orbit {position: absolute;   border: 1px solid #d4e3f5; border-radius: 100px; transform: rotate(-14deg);  width: 92px; height: 52px; border-color: #d5e1eb; }
-.hero-orbit-small {transform: rotate(14deg);  width: 72px; height: 66px; }
-.hero-phone {border: 3px solid #7d9dc4; transform: rotate(-10deg);   width: 52px; height: 82px; border-radius: 14px; padding: 7px 9px; background-color: #527596; border-color: #95acc1; }
-.hero-camera { width: 17px; height: 3px; border-radius: 3px; background-color: #adc8e8; align-self: center; }
+.hero-status-text { font-size: 11px; color: #3d63a3; }
+.hero-visual { align-items: center; justify-content: center; width: 70px; height: 82px; flex-shrink: 0; margin-left: 12px; }
+.hero-orbit { position: absolute; border: 1px solid #d4e3f5; border-radius: 100px; transform: rotate(-14deg); width: 72px; height: 46px; border-color: #8cbeee; background-color: rgba(196,232,255,0.20); }
+.hero-orbit-small { transform: rotate(14deg); width: 60px; height: 52px; border-color: #b0b7ec; background-color: transparent; }
+.hero-phone { border: 3px solid #7d9dc4; transform: rotate(-10deg); width: 43px; height: 68px; border-radius: 14px; padding: 7px 9px; background-color: #5d83e2; border-color: #a9d6ff; background-image: linear-gradient(to bottom right,#64b8f4,#6577d8); box-shadow: 0 8px 18px rgba(60,97,190,0.24); }
+.hero-camera { width: 17px; height: 3px; border-radius: 3px; background-color: #d2f0ff; align-self: center; }
 .hero-ai {color: #ffffff; font-weight: 600;   font-size: 21px; line-height: 27px; margin-top: 5px; }
-.hero-line { height: 3px; background-color: #adc8e8; border-radius: 2px; margin-top: 5px; }
+.hero-line { height: 3px; background-color: #c7e6ff; border-radius: 2px; margin-top: 5px; }
 .hero-line-short { width: 20px; }
-.hero-signal {position: absolute;     border: 4px solid #f5f9ff;   align-items: center; justify-content: center; transform: rotate(10deg);  top: 60px; left: 52px; width: 29px; height: 29px; border-width: 3px; border-color: #f8fafb; border-radius: 11px; background-color: #d6e6f3; }
-.hero-signal-text {color: #244d79;  font-weight: 600;  font-size: 16px; }
+.hero-signal { position: absolute; border: 4px solid #f5f9ff; align-items: center; justify-content: center; transform: rotate(10deg); top: 48px; left: 43px; width: 24px; height: 24px; border-width: 3px; border-color: #eef8ff; border-radius: 11px; background-color: #b8e9ff; }
+.hero-signal-text { color: #285cb0; font-weight: 600; font-size: 16px; }
 .hero-message {transition-property: transform,opacity;  flex: 1; }
+.hero-note-space { margin-top: 7px; }
+.hero-preview-line { flex: 1; }
 .hero-title {font-weight: 600;   font-size: 21px; line-height: 29px; color: #29465f; }
-.hero-note {font-size: 13px; line-height: 21px; color: #62788b; margin-top: 7px; }
-.hero-back-title {font-weight: 600; color: #183553;    font-size: 21px; line-height: 28px; margin-top: 4px; margin-bottom: 2px; }
+.hero-note {font-size: 13px; line-height: 21px; color: #536b7e; margin-top: 7px; }
+.hero-back-title { font-weight: 600; color: #203f76; font-size: 21px; line-height: 28px; margin-top: 4px; margin-bottom: 2px; }
 .hero-info {flex-direction: row; align-items: center; margin-top: 8px; }
-.hero-label {font-size: 12px; line-height: 18px;   width: 66px; color: #63798c; }
-.hero-value {color: #284b70; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;  flex: 1; font-size: 14px; line-height: 22px; }
+.hero-label { font-size: 12px; line-height: 18px; width: 66px; color: #55719a; }
+.hero-value { color: #2f538f; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex: 1; font-size: 14px; line-height: 22px; }
 .hero-checks {flex-direction: row;   margin-top: 12px; }
 .hero-check { flex: 1; flex-direction: row; align-items: center; }
 .hero-check-dot { width: 19px; height: 19px; text-align: center; line-height: 19px; font-size: 12px; color: #65809c; background-color: #e3edf9; border-radius: 10px; margin-right: 5px; }
 .hero-check-done { color: #247356; background-color: #dcefe7; }
-.hero-check-text { color: #59718c; font-size: 12px; }
+.hero-check-empty { border: 1px dashed #8ca8bf; background-color: rgba(255,255,255,0.24); }
+.hero-check-text { color: #4c6996; font-size: 12px; }
 .hero-back-note {color: #71869d; font-size: 12px;   margin-top: 12px; }
-.hero-flip-row {min-height: 44px; flex-direction: row; justify-content: space-between; align-items: center;   padding: 0 20px; border-top: 1px solid #e3eaf0; }
-.hero-flip-label { font-size: 12px; color: #587aa2; }
-.hero-flip-icon { font-size: 22px; color: #416c9b; }
-.hero-bottom {padding: 0 18px 18px; }
+.hero-flip-row { min-height: 44px; flex-direction: row; justify-content: space-between; align-items: center; padding: 0 20px; border-top: 1px solid #e3eaf0; border-top-color: rgba(131,164,214,0.23); }
+.hero-flip-label { font-size: 12px; color: #4e6d9a; }
+.hero-flip-icon { font-size: 22px; color: #4b7bd6; }
+.hero-bottom { padding: 0 16px 16px; }
 .hero-main { flex-direction: row; align-items: center; margin-top: 13px; }
-.hero-preview { flex-direction: row; align-items: center; margin-top: 13px; }
-.hero-preview-label { font-size: 11px; color: #74899a; margin-right: 8px; }
+.hero-preview { flex-direction: row; align-items: center; margin-top: 9px; background-color: rgba(205,224,255,0.44); padding: 7px 10px; border-radius: 12px; }
+.hero-preview-label { font-size: 11px; color: #4d6b99; margin-right: 8px; }
 .hero-preview-value { flex: 1; font-size: 12px; color: #536f87; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 </style>

@@ -59,7 +59,7 @@ dependencies {
         'uni-getAccessibilityInfo-release.aar', 'uni-getAppAuthorizeSetting-release.aar',
         'uni-getSystemSetting-release.aar', 'uni-openAppAuthorizeSetting-release.aar',
         'uni-prompt-release.aar', 'uni-modal-release.aar', 'uni-rpx2px-release.aar', 'uni-secure-network-release.aar',
-        'uni-clipboard-release.aar', 'uni-form-release.aar', 'uni-swiper-release.aar'
+        'uni-clipboard-release.aar', 'uni-form-release.aar', 'uni-swiper-release.aar', 'uni-vibrate-release.aar'
     ])
     implementation 'androidx.tracing:tracing-ktx:1.3.0'
     implementation 'androidx.core:core-ktx:1.10.1'

@@ -3,11 +3,16 @@ import * as native from '@/uni_modules/kira-phone'
 // #endif
 
 const unavailable = () => { throw new Error('网页仅供界面预览，请在 Android APK 中连接手机') }
-let previewShield = true
+let previewShield = false
 let adapter = {
+  projectUrl: () => 'https://github.com/fcll32/kiraai-phone-assistant',
+  openProject: unavailable,
+  checkUpdateQuietly() {},
+  readUpdateState: () => JSON.stringify({ status: 'idle', progress: 0, version: '', notes: '', detail: '在 Android App 中检查和下载更新；网页只预览界面。' }),
+  checkUpdate: unavailable, downloadUpdate: unavailable, cancelUpdate: unavailable, installUpdate: unavailable,
   readState: () => JSON.stringify({ running: false, connected: false, configured: false,
     accessibility: false, status: '网页界面预览', sdk: 30, deviceName: 'Android 手机',
-    deviceId: '', address: '', version: '1.1.6', reducedMotion: false, animationSpeed: 1,
+    deviceId: '', address: '', version: '1.0.1', reducedMotion: false, animationSpeed: 1,
     screenProtected: previewShield, secureConfigured: true }),
   readConfig: () => JSON.stringify({ address: '', password: '', fingerprint: '' }),
   readCallState: () => JSON.stringify({ active: false, status: 'idle', microphoneGranted: false, muted: false, speaker: true, level: 0, transcripts: [], detail: '网页仅预览界面，请在手机上开始通话。' }),
@@ -19,6 +24,9 @@ let adapter = {
   openAccessibility: unavailable, prepare() {}, secure() {},
   setSecure(enabled) { previewShield = enabled; return enabled }, savePreferences() {}, reveal() {}
 }
+// #ifdef H5
+adapter.openProject = () => { window.open(adapter.projectUrl(), '_blank', 'noopener,noreferrer') }
+// #endif
 // #ifdef APP-ANDROID
 adapter = native
 // #endif

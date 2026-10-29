@@ -1,12 +1,12 @@
 <template>
   <view class="app" :style="{ paddingTop: insetTop + 'px', paddingBottom: insetBottom + 'px' }">
     <view class="scene" :style="sceneStyle">
-    <view class="sky">
-      <view v-for="(star, si) in stars" :key="si" class="star" :style="starStyle(star, si)" />
-    </view>
+    <AppBackdrop :scene="pageScenes[page]" />
     <view class="header" :style="headerStyle">
-      <view class="menu-btn" role="button" aria-label="打开菜单" @click="openDrawer">
+      <view id="guide-menu" class="menu-btn" role="button" :aria-label="hasAppUpdate ? '打开菜单，有新版可更新' : '打开菜单'" @click="openDrawer">
+        <GlassSurface :radius="14" :sdk="state.sdk" :active="glassActive" />
         <view class="menu-line" />
+        <view v-if="hasAppUpdate" class="menu-update-dot" aria-hidden="true" />
         <view class="menu-line menu-line-short" />
         <view class="menu-line" />
       </view>
@@ -14,25 +14,25 @@
         <text class="header-title">{{ titles[page] }}</text>
         <text class="header-sub">{{ toolbarSubs[page] }}</text>
       </view>
-      <view class="status-chip" :class="headerConnected ? 'status-on' : ''">
+      <view id="guide-status" class="status-chip" :class="headerConnected ? 'status-on' : ''">
+        <GlassSurface :radius="24" :sdk="state.sdk" :active="glassActive" />
         <view class="status-dot" :class="headerConnected ? 'status-dot-on' : ''" />
         <text class="status-text" :class="headerConnected ? 'status-text-on' : ''">{{ connectionShort }}</text>
       </view>
     </view>
 
     <view class="stage" :style="stageStyle" @touchstart="stageStart" @touchmove="stageMove" @touchend="stageEnd" @touchcancel="resetStage">
-    <scroll-view v-if="page === 0" class="page" scroll-y>
+    <view class="portrait-zone" :style="{ height: portraitHeight + 'px' }">
+      <view class="portrait-copy" :style="{ width: portraitCopyWidth + 'px' }"><PageIntro :key="page" :kicker="pageIntros[page].kicker" :title="pageIntros[page].title" :description="pageIntros[page].note" :font-size="22" :line-height="29" :width="portraitCopyWidth" :active="visible" :duration="motion(400, 'transition')" /></view>
+    </view>
+    <scroll-view v-if="page === 0" class="page" scroll-y :scroll-top="homeScroll" @scroll="homeOffset = $event.detail.scrollTop">
       <view class="page-content">
-        <text class="kicker">我的 AI 设备</text>
-        <text class="headline">KiraAI 手机助手</text>
-        <text class="lede">连接你的服务器，剩下的交给对话。</text>
-        <text class="text-link" role="button" @click="openGuide">第一次使用？跟着引导连接 ›</text>
 
         <ConnectionHero :title="heroTitle" :note="connectionNote" :connected="state.connected" :running="state.running"
           :address="state.address" :device="state.deviceName" :checks="checks" :copy-style="heroCopyStyle"
-          :duration="motion(480, 'cards')" :active="visible && !drawerOpen && !detailOpen && !wheel">
+          :duration="motion(480, 'cards')" :sdk="state.sdk" :active="glassActive" @setup="heroSetup">
           <view class="sweep-track"><view class="sweep-fill" :style="sweepStyle" /></view>
-          <view class="cta-wrap" :style="ctaWrapStyle" @touchstart="ctaDown" @touchend="ctaUp" @touchcancel="ctaUp">
+          <view id="guide-connect" class="cta-wrap" :style="ctaWrapStyle" @touchstart="ctaDown" @touchend="ctaUp" @touchcancel="ctaUp">
             <FeedbackButton :label="state.running ? '停止连接' : '开始连接'" busy-text="正在启动" success-text="已连接"
               :state="connectButton" :animated="effects.feedback" :speed="speed" :active="visible && !drawerOpen && !detailOpen" :shine="false" @press="toggleConnection" />
           </view>
@@ -41,11 +41,11 @@
 
         <view class="section-heading">
           <text class="section-title">连接准备</text>
-          <text class="section-count">{{ readyCount }} / 3</text>
+          <StableNumber :value="readyCount + ' / 3'" />
         </view>
 
         <SwipeDeck :cards="setupSteps" :checks="checks" :current="step" :width="deckWidth" :height="238"
-          :duration="motionDuration" @change="step = $event" @select="openDetail" @grab="stageLock" />
+          :duration="motionDuration" :active="visible" @change="step = $event" @select="openDetail" @grab="stageLock" />
         <text class="swipe-hint">左右滑动切换 · 轻点卡片查看步骤</text>
 
         <view class="section-heading" role="button" :aria-expanded="expanded" @click="toggleStack"><text class="section-title">更多功能</text><text class="section-count">{{ expanded ? '收起 −' : '展开 3 项 +' }}</text></view>
@@ -73,36 +73,28 @@
 
     <scroll-view v-if="page === 1" class="page" scroll-y>
       <view class="page-content">
-        <text class="headline small-headline">接上你的服务器</text>
-        <text class="lede">复制 KiraAI“手机连接”页面中的三项内容。</text>
-        <FloatingField v-model="form.address" label="服务器地址 · 公网 IP:端口" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
-        <text class="field-note">例如 203.0.113.10:8443，不用填写长后缀。</text>
-        <FloatingField v-model="form.password" label="连接密码" :password="!showPassword" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
+        <view class="connection-form"><view class="form-heading"><view class="form-step"><text class="form-step-text">01</text></view><view><text class="detail-title">粘贴连接信息</text><text class="small muted">从插件的“手机配对”页面复制</text></view></view>
+        <FloatingField v-model="form.address" label="服务器地址" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" :active="visible" :error="formErrors.address" :error-revision="errorRevisions.address" @input="clearFieldError('address')" />
+        <text class="field-note">例如 203.0.113.10:5267，不用填写长后缀。</text>
+        <FloatingField v-model="form.password" label="连接密码" :maxlength="128" :password="!showPassword" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" :active="visible" :error="formErrors.password" :error-revision="errorRevisions.password" select-on-error @input="clearFieldError('password')" />
+        <PasswordStrength :value="form.password.trim()" :duration="motion(250, 'feedback')" :active="visible" />
         <text class="text-link" role="button" @click="showPassword = !showPassword">{{ showPassword ? '隐藏密码' : '显示密码' }}</text>
-        <FloatingField v-model="form.fingerprint" label="服务器校验码" multiline :maxlength="200" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" @input="saveButton = 'idle'" />
+        <FloatingField v-model="form.fingerprint" label="服务器校验码" multiline :maxlength="200" :disabled="state.running || voice.active || mic.active" :duration="motion(200, 'feedback')" :active="visible" :error="formErrors.fingerprint" :error-revision="errorRevisions.fingerprint" @input="clearFieldError('fingerprint')" />
         <text class="field-note">用于确认连的是你的服务器。有可信证书时可以留空。</text>
         <view class="form-action">
           <FeedbackButton label="保存设置" success-text="设置已保存" busy-text="正在保存" :state="saveButton" :animated="effects.feedback" :speed="speed" :active="visible" :disabled="state.running || voice.active || mic.active" @press="saveConnection" />
         </view>
         <text v-if="state.running || voice.active" class="field-note">修改设置前，请先停止连接并挂断通话。</text>
-        <view class="divider" />
-        <view class="list-row" @click="copyDeviceId"><view><text class="detail-title on-sky-title">设备 ID</text><text class="muted small on-sky-note">需要固定这台手机时使用</text></view><text class="card-link on-sky-link">复制</text></view>
+        </view>
+        <view class="list-row device-id-row" @click="copyDeviceId"><view><text class="detail-title on-sky-title">设备 ID</text><text class="muted small on-sky-note">需要固定这台手机时使用</text></view><text class="card-link on-sky-link">复制</text></view>
       </view>
     </scroll-view>
 
     <scroll-view v-if="page === 2" class="page" scroll-y>
       <view class="page-content">
-        <text class="headline small-headline">界面与动效</text>
-        <text class="lede">选择你喜欢的反馈方式与动画速度。</text>
-
-        <view class="pref-hero" :class="'pref-hero-' + selection.count">
-          <ProgressRing :value="selection.count" :total="3" :size="120" :animated="effects.feedback" :speed="speed" />
-          <view class="pref-copy">
-            <text class="pref-kicker">动效清单</text>
-            <text class="pref-title">{{ selectionTitle }}</text>
-            <text class="muted small pref-note">{{ selectionNote }}</text>
-          </view>
-        </view>
+        <view class="project-link" role="link" aria-label="打开 GitHub 项目" @click="openProject"><view class="project-copy"><text class="detail-title">GitHub 项目</text><text class="project-address" :lines="2">{{ projectAddress }}</text></view><text class="project-arrow">↗</text></view>
+        <UpdatePanel :version="state.version" :active="visible" :animated="effects.feedback" :speed="speed" @state="acceptUpdateState" />
+        <view class="section-heading"><text class="section-title">界面与动效</text><text class="section-count">随心调整</text></view>
 
         <view class="preference-card">
           <view class="check-row" role="checkbox" :aria-checked="selection.partial ? 'mixed' : selection.all ? 'true' : 'false'" @click="setAllEffects">
@@ -130,10 +122,6 @@
 
     <scroll-view v-if="page === 3" class="page" scroll-y>
       <view class="page-content">
-        <view class="about-brand">
-          <view><text class="section-title">KiraAI 手机助手</text><text class="about-version small">版本 {{ state.version }} · Android</text></view>
-        </view>
-        <view class="list-row" role="button" @click="openGuide"><text class="detail-title">新手引导</text><text class="card-link">再看一遍 ›</text></view>
         <view class="about-card">
           <text class="detail-title">从一句话开始</text>
           <text class="example">“检查手机连接，然后打开设置。”</text>
@@ -153,39 +141,49 @@
     </scroll-view>
     <scroll-view v-if="page === 4" class="page" scroll-y>
       <view class="page-content">
-        <CallPanel :voice="voice" :mic="mic" :lab-open="labOpen" :animated="effects.feedback" :speed="speed" :visible="visible"
+        <CallPanel :show-intro="false" :voice="voice" :mic="mic" :lab-open="labOpen" :width="deckWidth" :intro-duration="motion(400, 'transition')" :animated="effects.feedback" :speed="speed" :visible="visible"
           @start="startCall" @stop="stopCall" @mute="toggleMute" @speaker="toggleSpeaker" @interrupt="interruptCall"
           @authorize="authorizeMic" @test="testMic" @stop-test="stopMic" @expand-lab="labOpen = !labOpen" />
       </view>
     </scroll-view>
     </view>
 
-    <LiquidNav :page="page" :width="deckWidth + 20" :duration="motion(400, 'transition')" @change="navigate" />
+    <LiquidNav :page="page" :width="deckWidth + 20" :sdk="state.sdk" :active="visible" :interactive="glassActive" :duration="motion(400, 'transition')" @change="navigate" />
     </view>
 
     <view v-if="drawerOpen" class="drawer-scrim" :style="{ opacity: drawerShift * 0.34 }" @click="closeDrawer" />
     <view v-if="drawerOpen" class="drawer" :style="drawerStyle">
+      <AppBackdrop scene="menu" :width="300" />
       <view class="drawer-head">
-        <view class="drawer-badge"><text class="drawer-letter">AI</text></view>
-        <view>
+        <view class="drawer-brand-copy">
           <text class="drawer-title">KiraAI 手机助手</text>
           <text class="drawer-sub">你的手机，由你掌控</text>
         </view>
       </view>
       <view class="drawer-rule" />
-      <view class="drawer-body">
+      <scroll-view class="drawer-body" scroll-y>
         <view v-for="(item,index) in drawerItems" :key="item.key" class="drawer-item"
           :class="item.page === page ? 'drawer-item-on' : ''" :style="drawerItemStyle(index)"
           role="button" @touchstart="markReveal($event)" @click="drawerGo(item)">
-          <view class="drawer-dot" :class="item.page === page ? 'drawer-dot-on' : ''" />
+          <image class="drawer-menu-icon" :src="'/static/companions/' + item.icon + '.png'" mode="aspectFit" aria-hidden="true" />
           <text class="drawer-label" :class="item.page === page ? 'drawer-label-on' : ''">{{ item.label }}</text>
+          <view v-if="item.key === 'about' && hasAppUpdate" class="drawer-update-dot" aria-label="有新版可更新" />
           <text v-if="item.note" class="drawer-note">{{ item.note }}</text>
         </view>
-      </view>
+        <view class="drawer-signals" aria-label="手机功能状态">
+          <text class="signals-title">现在的状态</text>
+          <view v-for="(row, rowIndex) in signalRows" :key="rowIndex" class="signal-row">
+            <view v-for="signal in row" :key="signal.key" class="signal-card" :class="signal.enabled ? 'signal-on' : ''" role="status" :aria-label="signal.title + '，' + signal.note">
+              <image class="signal-art" :src="'/static/companions/' + signal.sticker + '.png'" mode="aspectFit" aria-hidden="true" />
+              <text class="signal-title">{{ signal.title }}</text><text class="signal-note">{{ signal.note }}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
       <view class="drawer-foot">
         <view class="shield-row">
           <view v-if="shieldRippleOn" class="shield-ripple" :style="shieldRippleStyle" />
-          <view class="shield-copy" role="button" aria-label="切换防截屏保护" @click="toggleShield">
+          <image class="shield-art" :src="shield ? '/static/companions/shield.png' : '/static/companions/rest.png'" mode="aspectFit" aria-hidden="true" /><view class="shield-copy" role="button" aria-label="切换防截屏保护" @click="toggleShield">
             <text class="shield-title">防截屏保护</text>
             <text class="shield-note" :class="shield ? '' : 'shield-note-off'">{{ shield ? '截图与录屏显示为空白' : '已关闭，界面可被截取' }}</text>
           </view>
@@ -197,7 +195,7 @@
 
     <view v-if="transitionOn" class="transition-veil" :style="veilStyle" />
 
-    <SpringSheet :open="wheel" :inset="insetBottom" :duration="motion(400, 'cards')" @close="wheel = false" @progress="sheetProgress = $event" @motion="sheetMs = $event">
+    <SpringSheet :active="visible" :sdk="state.sdk" :open="wheel" :inset="insetBottom" :duration="motion(400, 'cards')" @close="wheel = false" @progress="sheetProgress = $event" @motion="sheetMs = $event">
       <SpeedWheel :value="wheelDraft" :labels="speedLabels" :multipliers="speedMultipliers" :animated="effects.cards"
         :duration="motion(560, 'cards')" :disabled="preferenceButton === 'success'" @change="onWheelChange" @settling="wheelSettling = $event" />
       <view class="sheet-actions">
@@ -205,7 +203,10 @@
       </view>
     </SpringSheet>
 
-    <SpringSheet :open="guideOpen && visible" title="从这里开始" note="四步连接 · 随时可以稍后再看" :height="guideHeight" :inset="insetBottom" :duration="motion(400, 'cards')" @close="closeGuide" @progress="sheetProgress = $event" @motion="sheetMs = $event">
+    <WelcomeGuide v-if="welcomeOpen" :active="visible" :duration="motion(400, 'cards')" :inset="insetTop" @finish="finishWelcome(true)" @skip="finishWelcome(false)" />
+    <SpotlightGuide v-if="spotlightOpen && visible" :rect="spotlightRect" :index="spotlightIndex" :busy="spotlightBusy" :active="visible" :duration="motion(400, 'cards')" :inset="insetTop" @next="nextSpotlight" @close="closeSpotlight" />
+
+    <SpringSheet :active="visible" :sdk="state.sdk" :open="guideOpen && visible" title="从这里开始" note="四步连接 · 随时可以稍后再看" :height="guideHeight" :inset="insetBottom" :duration="motion(400, 'cards')" @close="closeGuide" @progress="sheetProgress = $event" @motion="sheetMs = $event">
       <QuickStart v-if="guideOpen" :duration="motion(400, 'cards')" :animated="effects.feedback" :speed="speed" :active="visible" :configured="state.configured" :accessibility="state.accessibility" :connected="state.connected" @action="guideAction" @close="closeGuide" />
     </SpringSheet>
 
@@ -217,10 +218,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onUnmounted } from 'vue'
+import { ref, reactive, computed, nextTick, onUnmounted, watch } from 'vue'
 import { onShow, onHide, onReady, onBackPress } from '@dcloudio/uni-app'
+import AppBackdrop from '@/components/AppBackdrop.uvue'
 import FeedbackButton from '@/components/FeedbackButton.uvue'
 import ProgressRing from '@/components/ProgressRing.uvue'
+import PageIntro from '@/components/PageIntro.uvue'
+import StableNumber from '@/components/StableNumber.uvue'
 import SwipeDeck from '@/components/SwipeDeck.uvue'
 import SpeedWheel from '@/components/SpeedWheel.uvue'
 import CallPanel from '@/components/CallPanel.uvue'
@@ -232,27 +236,86 @@ import ConnectionHero from '@/components/ConnectionHero.uvue'
 import CapabilityFlip from '@/components/CapabilityFlip.uvue'
 import StickyDetail from '@/components/StickyDetail.uvue'
 import QuickStart from '@/components/QuickStart.uvue'
+import WelcomeGuide from '@/components/WelcomeGuide.uvue'
+import SpotlightGuide from '@/components/SpotlightGuide.uvue'
+import PasswordStrength from '@/components/PasswordStrength.uvue'
+import GlassSurface from '@/components/GlassSurface.uvue'
+import UpdatePanel from '@/components/UpdatePanel.uvue'
+import { connectionFieldIssue } from '@/lib/motion.js'
 import { createTimeoutScope } from '@/lib/timers.js'
 import { phone, errorText } from '@/lib/phone.js'
-import { readiness, nextSetupStep, selectionState, toggleAll, animationDuration } from '@/lib/interactions.js'
+import { readiness, nextSetupStep, selectionState, toggleAll, animationDuration, hasNewerUpdate, companionSignals } from '@/lib/interactions.js'
 
 const timeouts = createTimeoutScope()
 const later = timeouts.after, cancelLater = timeouts.cancel
 const visible = ref(true), wheelSettling = ref(false)
 const guideOpen = ref(false), guideHeight = ref(560)
+const welcomeOpen = ref(false), spotlightOpen = ref(false), spotlightIndex = ref(0), spotlightBusy = ref(false)
+const spotlightRect = ref({ left: 20, top: 60, width: 48, height: 48 })
+let spotlightRevision = 0, spotlightWait = null, spotlightRelease = null
+let firstLaunchHandled = false
+function showFirstLaunchGuide() {
+  if (firstLaunchHandled) return
+  firstLaunchHandled = true
+  const seen = state.configured || uni.getStorageSync('kira-onboarding-shown-v1') === true || uni.getStorageSync('kira-welcome-v1') === true || uni.getStorageSync('kira-quick-start-v1') === true
+  // Consume before presenting: closing the app mid-guide must not replay it.
+  uni.setStorageSync('kira-onboarding-shown-v1', true)
+  if (!seen) welcomeOpen.value = true
+}
+function finishWelcome(introduce = true) {
+  welcomeOpen.value = false
+  try { uni.setStorageSync('kira-welcome-v1', true); uni.setStorageSync('kira-quick-start-v1', true) } catch (error) { toast('介绍进度未能保存，可在使用说明查看连接步骤') }
+  if (introduce) { resetStage(); applyPage(0); measureSpotlight(0) }
+}
+function closeSpotlight() {
+  spotlightRevision++; spotlightOpen.value = false; spotlightBusy.value = false
+  if (spotlightWait != null) cancelLater(spotlightWait)
+  if (spotlightRelease != null) cancelLater(spotlightRelease)
+  spotlightWait = null; spotlightRelease = null
+}
+function measureSpotlight(index) {
+  const revision = ++spotlightRevision
+  spotlightBusy.value = true
+  if (spotlightWait != null) cancelLater(spotlightWait)
+  if (spotlightRelease != null) cancelLater(spotlightRelease)
+  const fallback = () => { if (revision !== spotlightRevision || !visible.value) return; closeSpotlight(); openGuide() }
+  if (typeof uni.createSelectorQuery !== 'function') { fallback(); return }
+  spotlightWait = later(fallback, 800)
+  nextTick(() => {
+    if (revision !== spotlightRevision || !visible.value) return
+    try { uni.createSelectorQuery().select(['#guide-menu', '#guide-connect', '#guide-status'][index]).boundingClientRect(rect => {
+      if (revision !== spotlightRevision || !visible.value) return
+      if (!rect || rect.width <= 0 || rect.height <= 0 || rect.top + rect.height <= 0 || rect.top >= uni.getWindowInfo().windowHeight) { fallback(); return }
+      cancelLater(spotlightWait); spotlightWait = null
+      spotlightRect.value = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      spotlightIndex.value = index; spotlightOpen.value = true
+      spotlightRelease = later(() => { if (revision === spotlightRevision) spotlightBusy.value = false }, motion(400, 'cards'))
+    }).exec() } catch (error) { fallback() }
+  })
+}
+function nextSpotlight(index) { if (spotlightBusy.value || index !== spotlightIndex.value) return; if (index === 2) closeSpotlight(); else measureSpotlight(index + 1) }
 function openGuide() { wheel.value = false; guideOpen.value = true }
 function closeGuide() {
   guideOpen.value = false
-  try { uni.setStorageSync('kira-quick-start-v1', true) } catch (error) { toast('引导进度未能保存，下次仍可从首页打开') }
+  try { uni.setStorageSync('kira-quick-start-v1', true) } catch (error) { toast('引导进度未能保存，可在使用说明查看连接步骤') }
 }
 function guideAction(index) {
   if (index === 2) { try { phone.openAccessibility() } catch (error) { toast(errorText(error)) }; return }
   closeGuide(); navigate(index === 1 ? 1 : 0)
 }
 let disposed = false, confirming = false, confirmationRevision = 0
-const titles = ['设备连接', '连接设置', '界面偏好', '使用说明与关于', '和 Kira 通话']
+const pageScenes = ['device', 'connection', 'about', 'guide', 'voice']
+const portraitHeight = ref(184), portraitCopyWidth = ref(164)
+const pageIntros = [
+  { kicker: '你的随身伙伴', title: '让 AI 走进手机', note: '看见、操作，陪你聊天。' },
+  { kicker: '连接设置', title: '接上你的 Kira', note: '复制信息，轻松配对。' },
+  { kicker: '关于与偏好', title: '按你的节奏', note: '项目、更新，还有动效。' },
+  { kicker: '使用说明', title: '一步一步来', note: '连好手机，一句话开始。' },
+  { kicker: '语音陪伴', title: '和 AI 聊一会儿', note: '用声音，连接你的 AI。' }
+]
+const titles = ['设备连接', '连接设置', '关于', '使用说明', '和 Kira 通话']
 const tabs = ['设备', '设置', '偏好', '关于', '通话']
-const toolbarSubs = ['本机连接与准备', '服务器地址与校验码', '动效清单与动画速度', '版本、隐私与帮助', '用声音连接你的 AI']
+const toolbarSubs = ['本机连接与准备', '服务器地址与校验码', '项目、更新与动效', '连接步骤与常见问题', '用声音连接你的 AI']
 const setupSteps = [
   { short: '填地址', title: '连接你的服务器', description: '只需要 IP、端口，以及页面中的连接信息。', action: '填写连接设置' },
   { short: '开权限', title: '让手机可以操作', description: '在系统设置中开启本 App 的无障碍服务。', action: '打开无障碍设置' },
@@ -263,10 +326,12 @@ const effectOptions = [
   { key: 'cards', title: '卡片与弹窗', note: '叠卡、翻面、滑动吸附和弹窗回弹' },
   { key: 'transition', title: '页面切换', note: '胶囊跟随页签，页面轻轻推入' }
 ]
-const navOrder = [0, 1, 4, 2]
+const navOrder = [0, 1, 4]
 const sheetProgress = ref(0), sheetMs = ref(0)
 const sceneStyle = computed(() => ({ transform: 'scale(' + (1 - sheetProgress.value * 0.08) + ')', borderRadius: sheetProgress.value > 0 ? '28px' : '0px', transitionDuration: sheetMs.value + 'ms' }))
 const page = ref(0), expanded = ref(false), wheel = ref(false), step = ref(0)
+const homeScroll = ref(0)
+let homeOffset = 0
 const insetTop = ref(24), insetBottom = ref(12), speed = ref(1), showPassword = ref(false)
 const wheelDraft = ref(1), deckWidth = ref(346), tabWidth = ref(92), revealX = ref(0), revealY = ref(0)
 const transitionOn = ref(false)
@@ -278,19 +343,7 @@ const stageEase = ref('cubic-bezier(0.24,1.4,0.4,1)')
 const pillSquash = ref(1)
 const tabYield = ref(false)
 const drawerOpen = ref(false), drawerShift = ref(0), drawerMs = ref(0)
-const starTwinkle = ref(false)
-const stars = []
-for (let i = 0; i < 12; i++) {
-  stars.push({ left: (i * 37 + 5) % 96, top: (i * 61 + 7) % 86, size: 1 + (i % 3), base: 0.22 + (i % 6) * 0.10 })
-}
-function starStyle(star, index) {
-  return {
-    left: star.left + '%', top: star.top + '%', width: star.size + 'px', height: star.size + 'px',
-    opacity: starTwinkle.value ? star.base * 0.45 : star.base,
-    transitionDuration: motion(1800, 'transition') + 'ms', transitionDelay: motion(index * 70, 'transition') + 'ms'
-  }
-}
-const shield = ref(true), shieldBusy = ref(false), shieldRevision = ref(0)
+const shield = ref(false), shieldBusy = ref(false), shieldRevision = ref(0)
 const shieldRippleOn = ref(false)
 const shieldRippleStyle = ref({ transform: 'scale(0.3)', opacity: 0.4, transitionDuration: '0ms' })
 const drawerEase = ref('cubic-bezier(0.22,1.12,0.36,1)')
@@ -302,11 +355,11 @@ const sweepProgress = ref(0), sweepOpacity = ref(0)
 const ctaBreath = ref(false), ctaPress = ref(false)
 let ctaBreathTimer = null
 const drawerItems = [
-  { key: 'device', label: '设备连接', page: 0, note: '' },
-  { key: 'setup', label: '连接设置', page: 1, note: '' },
-  { key: 'prefs', label: '界面偏好', page: 2, note: '' },
-  { key: 'about', label: '使用说明与关于', page: 3, note: '' },
-  { key: 'call', label: '和 Kira 通话', page: 4, note: '语音' }
+  { key: 'device', icon: 'device', label: '设备连接', page: 0, note: '' },
+  { key: 'setup', icon: 'link', label: '连接设置', page: 1, note: '' },
+  { key: 'call', icon: 'call', label: '和 Kira 通话', page: 4, note: '语音' },
+  { key: 'help', icon: 'guide', label: '使用说明', page: 3, note: '' },
+  { key: 'about', icon: 'about', label: '关于', page: 2, note: '' }
 ]
 const detailOpen = ref(false), detailIndex = ref(0), detailBusy = ref(false)
 const detailLeft = ref(10), detailTop = ref(30), detailWidth = ref(370), detailHeight = ref(700)
@@ -379,11 +432,41 @@ const speedLabels = ['轻快', '舒适', '从容']
 const speedMultipliers = ['更快', '标准', '更慢']
 const state = reactive({ running: false, connected: false, configured: false, accessibility: false, status: '正在读取',
   deviceName: 'Android 手机', deviceId: '', address: '', sdk: 30, version: '—', animationSpeed: 1 })
+const updateNotice = reactive({ version: '', status: 'idle' })
+const projectAddress = ref('https://github.com/fcll32/kiraai-phone-assistant')
+const hasAppUpdate = computed(() => hasNewerUpdate(updateNotice.version, state.version))
+let updatePoll = null
+function acceptUpdateState(value) {
+  if (!value || typeof value !== 'object') return
+  if (typeof value.version === 'string') updateNotice.version = value.version
+  if (typeof value.status === 'string') updateNotice.status = value.status
+}
+function refreshUpdateNotice() {
+  if (disposed || !visible.value || typeof phone.readUpdateState !== 'function') return
+  try { acceptUpdateState(JSON.parse(phone.readUpdateState())) } catch (error) { }
+}
+function startUpdateWatch() {
+  if (disposed || updatePoll != null) return
+  refreshUpdateNotice()
+  try { if (typeof phone.checkUpdateQuietly === 'function') phone.checkUpdateQuietly() } catch (error) { }
+  updatePoll = setInterval(refreshUpdateNotice, 2000)
+}
+function stopUpdateWatch() { if (updatePoll != null) clearInterval(updatePoll); updatePoll = null }
+function openProject() { try { phone.openProject() } catch (error) { toast(errorText(error)) } }
 const form = reactive({ address: '', password: '', fingerprint: '' })
+const formErrors = reactive({ address: '', password: '', fingerprint: '' })
+const errorRevisions = reactive({ address: 0, password: 0, fingerprint: 0 })
+function clearFieldError(field) { formErrors[field] = ''; saveButton.value = 'idle' }
+function showFieldError(field, message) {
+  formErrors[field] = message; errorRevisions[field]++
+  if (effects.feedback && visible.value && typeof uni.vibrateShort === 'function') { try { uni.vibrateShort({ type: 'light' }) } catch (error) { } }
+}
+function configError(message) { const field = /密码|password/i.test(message) ? 'password' : /校验码|证书|fingerprint/i.test(message) ? 'fingerprint' : /地址|端口|url/i.test(message) ? 'address' : ''; if (field) showFieldError(field, message) }
 const voice = reactive({ active: false, status: 'idle', detail: '', microphoneGranted: false, muted: false, speaker: true, level: 0, transcripts: [] })
 const mic = reactive({ supported: false, authorized: false, active: false, status: 'idle', detail: '', verified: false, latencyMs: -1 })
 const labOpen = ref(false)
 const effects = reactive({ feedback: true, cards: true, transition: true })
+const glassActive = computed(() => visible.value && !drawerOpen.value && !detailOpen.value && !wheel.value && !guideOpen.value && !welcomeOpen.value && !spotlightOpen.value)
 const saveButton = ref('idle'), connectButton = ref('idle'), preferenceButton = ref('idle')
 const connectionFeedback = ref('')
 const checks = computed(() => readiness(state)), selection = computed(() => selectionState(effects))
@@ -397,6 +480,8 @@ const connectionNote = computed(() => heroSnapshot.value ? heroSnapshot.value.no
 const heroPill = computed(() => state.connected ? '已就绪' : state.running ? '连接中' : '待连接')
 const headerConnected = computed(() => page.value === 4 ? voice.connected === true : state.connected)
 const connectionShort = computed(() => page.value === 4 ? voice.connected ? '通话中' : voice.active ? '接通中' : '未通话' : state.connected ? '在线' : state.running ? '连接中' : '未连接')
+const signals = computed(() => companionSignals(state, voice, mic, shield.value, effects))
+const signalRows = computed(() => [signals.value.slice(0, 3), signals.value.slice(3, 6)])
 const selectionTitle = computed(() => selection.value.all ? '全部开启' : selection.value.count === 0 ? '全部关闭' : '已开启 ' + selection.value.count + ' 项')
 const selectionNote = computed(() => selection.value.all ? '所有动效都会播放' : selection.value.count === 0 ? '界面保持安静，只保留必要反馈' : '没勾选的动效会安静下来')
 const stackBoxStyle = computed(() => ({ height: (expanded.value ? 300 : 120) + 'px' }))
@@ -434,6 +519,7 @@ function refresh(forceDiagnostics = true) {
       successTimer = later(() => { connectButton.value = 'idle' }, motion(1400, 'feedback'))
     } else if (!value.running && !starting) connectButton.value = 'idle'
     if (!value.running && !starting && previousRunning) cancelHeroTransition()
+    if (previousRunning && !value.running && /密码.*不匹配|校验码.*不一致/.test(value.status || '')) configError(value.status)
     previousConnected = value.connected
     previousRunning = value.running
   } catch (error) { state.status = errorText(error) }
@@ -475,8 +561,8 @@ function testMic(target) {
 }
 function stopMic() { voiceAction(() => phone.stopVirtualMic()) }
 watch(() => page.value === 4 && labOpen.value, open => { if (open && visible.value) refreshVoice() })
-function startPolling() { refresh(); if (poll == null) poll = setInterval(() => refresh(false), 900) }
-function stopPolling() { if (poll != null) clearInterval(poll); poll = null }
+function startPolling() { refresh(); if (poll == null) poll = setInterval(() => refresh(false), 900); startUpdateWatch() }
+function stopPolling() { if (poll != null) clearInterval(poll); poll = null; stopUpdateWatch() }
 function startCta() { stopCta() }
 function stopCta() {
   if (ctaBreathTimer != null) { clearInterval(ctaBreathTimer); ctaBreathTimer = null }
@@ -489,10 +575,13 @@ onReady(() => {
   insetTop.value = window.statusBarHeight || 24
   insetBottom.value = window.safeAreaInsets ? Math.max(12, window.safeAreaInsets.bottom) : 12
   guideHeight.value = Math.min(600, Math.max(320, window.windowHeight - insetTop.value - 20))
+  portraitHeight.value = window.windowHeight < 700 ? 142 : 184
+  portraitCopyWidth.value = Math.min(182, Math.max(138, window.windowWidth * 0.43))
   deckWidth.value = Math.max(280, window.windowWidth - 40)
   tabWidth.value = Math.max(48, (window.windowWidth - 20) / titles.length)
   try {
     phone.prepare(); refresh(); Object.assign(form, JSON.parse(phone.readConfig()))
+    if (typeof phone.projectUrl === 'function') projectAddress.value = phone.projectUrl()
     const saved = uni.getStorageSync('kira-ui-effects')
     if (saved && typeof saved === 'object') for (const key of ['feedback', 'cards', 'transition']) if (typeof saved[key] === 'boolean') effects[key] = saved[key]
     const savedSpeed = Number(state.animationSpeed)
@@ -501,16 +590,17 @@ onReady(() => {
     if (state.secureConfigured === false && typeof savedShield === 'boolean') setShield(savedShield)
     refresh()
     step.value = nextSetupStep(state)
-    if (!state.configured && uni.getStorageSync('kira-quick-start-v1') !== true) guideOpen.value = true
+    showFirstLaunchGuide()
   } catch (error) { toast(errorText(error)) }
   startCta()
   startStars()
 })
 function startStars() { if (starTimer != null) clearInterval(starTimer); starTimer = null }
 onShow(() => { visible.value = true; try { phone.secure() } catch (error) { toast(errorText(error)) }; startPolling(); startCta(); startStars() })
-onHide(() => { visible.value = false; stopPolling(); stopCta(); startStars(); showPassword.value = false; resetStage(); cancelHeroTransition(); starting = false; confirming = false; confirmationRevision++; connectButton.value = 'idle'; connectionFeedback.value = '' })
+onHide(() => { visible.value = false; closeSpotlight(); stopPolling(); stopCta(); startStars(); showPassword.value = false; resetStage(); cancelHeroTransition(); starting = false; confirming = false; confirmationRevision++; connectButton.value = 'idle'; connectionFeedback.value = '' })
 onUnmounted(() => {
   disposed = true; timeouts.dispose()
+  closeSpotlight()
   stopPolling()
   stopCta()
   if (starTimer != null) { clearInterval(starTimer); starTimer = null }
@@ -518,6 +608,8 @@ onUnmounted(() => {
   while (veilTimers.length > 0) cancelLater(veilTimers.pop())
 })
 onBackPress(() => {
+  if (welcomeOpen.value) { finishWelcome(false); return true }
+  if (spotlightOpen.value || spotlightBusy.value) { closeSpotlight(); return true }
   if (guideOpen.value) { closeGuide(); return true }
   if (drawerOpen.value) { closeDrawer(); return true }
   if (detailOpen.value) { closeDetail(); return true }
@@ -578,6 +670,11 @@ function navigate(index) {
       stageTimer = later(() => { stageTimer = null; stageMs.value = 0 }, stageMs.value + 20)
     }, 16)
   })
+}
+function heroSetup(index) {
+  if (index === 0) { navigate(1); return }
+  if (index === 1) { if (state.accessibility) toast('无障碍服务已经开启'); else { try { phone.openAccessibility() } catch (error) { toast(errorText(error)) } }; return }
+  runStep(2)
 }
 function enterFromRight() {
   if (!effects.transition) return
@@ -902,12 +999,14 @@ function detailEnd() {
 async function saveConnection() {
   refresh()
   if (state.running || voice.active || mic.active) { toast('请先停止连接、通话和麦克风实验'); return }
+  const issue = connectionFieldIssue(form)
+  if (issue) { showFieldError(issue.field, issue.message); toast(issue.message); return }
   saveButton.value = 'busy'
   await nextTick()
   try {
     phone.saveConfig(form.address.trim(), form.password.trim(), form.fingerprint.trim())
     Object.assign(form, JSON.parse(phone.readConfig())); refresh(); saveButton.value = 'success'
-  } catch (error) { saveButton.value = 'idle'; toast(errorText(error)) }
+  } catch (error) { saveButton.value = 'idle'; configError(errorText(error)); toast(errorText(error)) }
 }
 function connectionMessage(message) { connectionFeedback.value = message; toast(message) }
 function saveConnectionDraft() {
@@ -928,15 +1027,17 @@ function toggleConnection() {
     return
   }
   if (!form.address.trim()) {
-    connectionMessage('请填写服务器地址，例如 203.0.113.10:8443')
+    showFieldError('address', '请填写服务器地址，例如 203.0.113.10:5267')
+    connectionMessage('请填写服务器地址，例如 203.0.113.10:5267')
     return
   }
   if (!form.password.trim()) {
+    showFieldError('password', '请填写连接密码')
     connectionMessage('请填写连接密码')
     return
   }
   try { saveConnectionDraft() }
-  catch (error) { connectionMessage(errorText(error)); return }
+  catch (error) { configError(errorText(error)); connectionMessage(errorText(error)); return }
   if (!state.configured) { connectionMessage('请先在连接设置中填写并保存服务器信息'); return }
   if (!state.accessibility) { step.value = 1; connectionMessage('无障碍服务还没就绪。开启后回到 App，稍等片刻再点连接。'); return }
   const revision = ++confirmationRevision
@@ -989,34 +1090,40 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 </script>
 
 <style>
-.scene {transition-property: transform; transition-timing-function: cubic-bezier(0.22,1.12,0.36,1); flex: 1; overflow: hidden;    background-color: #e9eef2; }
-.app {position: relative; flex: 1;    background-color: #e9eef2; }
-.sky {pointer-events: none; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 0;  opacity: 0.16; }
-.star {transition-property: opacity; position: absolute; border-radius: 50%;   background-color: #8aa0b5; }
-.header {position: relative; z-index: 1;   flex-direction: row; align-items: center; transition-property: transform, opacity;  height: 68px; padding: 8px 20px 4px; }
-.menu-btn {width: 44px; height: 44px;   align-items: center; justify-content: center;  background-color: #f7f9fb; border-radius: 14px; }
-.menu-line {width: 16px; height: 2px; border-radius: 1px;     background-color: #45627c; margin-top: 3px; margin-bottom: 3px; }
+.scene { transition-property: transform; transition-timing-function: cubic-bezier(0.22,1.12,0.36,1); flex: 1; overflow: hidden; background-color: #d9e9ff; background-image: none; }
+.app { position: relative; flex: 1; background-color: #d9e9ff; }
+.header { position: relative; z-index: 1; flex-direction: row; align-items: center; transition-property: transform, opacity; height: 76px; padding: 10px 20px 6px; }
+.menu-btn { position: relative; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 14px; box-shadow: 0 4px 14px rgba(45,80,160,0.08); }
+.menu-update-dot { position: absolute; right: 3px; top: 3px; width: 8px; height: 8px; border-radius: 4px; background-color: #c85c62; border: 2px solid #edf2f6; pointer-events: none; }
+.drawer-update-dot { width: 7px; height: 7px; border-radius: 4px; background-color: #c85c62; margin-left: 8px; }
+.about-heading { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.about-title { color: #29465f; font-size: 25px; line-height: 34px; font-weight: 600; }
+.project-link { flex-direction: row; align-items: center; padding: 18px 20px; background-color: rgba(247,251,255,0.86); border-radius: 26px; margin-bottom: 18px; box-shadow: 0 6px 20px rgba(59,81,164,0.09); border: 1px solid rgba(255,255,255,0.8); }
+.project-copy { flex: 1; }
+.project-address { color: #506b97; font-size: 11px; line-height: 18px; margin-top: 4px; }
+.project-arrow { font-size: 22px; color: #4778d5; margin-left: 12px; }
+.menu-line { width: 17px; height: 2px; border-radius: 1px; background-color: #284b83; margin-top: 3px; margin-bottom: 3px; }
 .menu-line-short { width: 10px; }
 .header-badge { width: 40px; height: 40px; border-radius: 12px; background-color: #14171a; align-items: center; justify-content: center; }
 .header-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
 .header-copy { flex: 1; margin-left: 12px; flex-direction: column; }
-.header-title {font-weight: 600;   color: #29465f; font-size: 16px; }
-.header-sub {margin-top: 4px;  color: #63798c; font-size: 11px; }
-.status-chip {flex-direction: row; align-items: center;  border-radius: 999px;  border-style: solid; border-width: 1px;   background-color: #dde6ee; border-color: #d5e0e9; padding: 7px 10px; }
-.status-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #93aacb; margin-right: 8px; }
-.status-text {font-size: 11px;    color: #526c82; }
-.status-on {background-color: #d9e9e2; }
+.header-title { font-weight: 700; color: #1e386a; font-size: 16px; }
+.header-sub { margin-top: 4px; color: #46618c; font-size: 11px; }
+.status-chip { position: relative; flex-direction: row; align-items: center; border-radius: 999px; padding: 9px 12px; }
+.status-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #6a8bc8; margin-right: 8px; }
+.status-text { font-size: 11px; color: #315380; }
+.status-on {background-color: rgba(129,190,159,0.40); }
 .status-dot-on { background-color: #25c08a; }
 .status-text-on { color: #12805d; }
 
 .stage { position: relative; z-index: 1; flex: 1; overflow: hidden; flex-direction: column; transition-property: transform, opacity; }
 .page { flex: 1; }
-.page-content {padding: 14px 20px 28px; }
+.page-content { padding: 12px 20px 28px; }
 .kicker {color: #698095; letter-spacing: 1px; font-size: 11px; margin-bottom: 5px; }
 .headline {font-weight: 600;    color: #233f58; font-size: 25px; line-height: 34px; }
 .small-headline {font-size: 24px; line-height: 33px; }
 .lede {color: #607588; font-size: 13px; line-height: 21px; margin-top: 6px; margin-bottom: 20px; }
-.muted {font-size: 14px; line-height: 21px;  color: #637588; }
+.muted { font-size: 14px; line-height: 21px; color: #536a92; }
 .small { font-size: 12px; line-height: 19px; }
 
 .hero-card { position: relative; overflow: hidden; padding: 24px; border-radius: 20px; background-color: #ffffff; border-style: solid; border-width: 1px; border-color: #dfe7f2; }
@@ -1036,43 +1143,42 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 .meta-divider { width: 1px; height: 26px; background-color: #e9eff9; margin: 0 12px; }
 .hero-action { margin-top: 16px; }
 .cta-wrap { position: relative; border-radius: 30px; }
-.connection-feedback { font-size: 13px; line-height: 21px; color: #73513a; margin-top: 10px; }
+.connection-feedback { font-size: 13px; line-height: 21px; color: #83502c; margin-top: 10px; }
 .cta-halo { pointer-events: none; position: absolute; left: -3px; right: -3px; top: -3px; bottom: -3px; border-radius: 33px; border-style: solid; border-width: 1px; border-color: rgba(124,196,255,0.45); background-color: rgba(124,196,255,0.10); }
 .hero-copy { transition-property: transform, opacity; }
 .sweep-track { height: 2px; border-radius: 1px; background-color: transparent; overflow: hidden; margin-bottom: 8px; }
-.sweep-fill { width: 100%; transform-origin: left center; height: 2px; border-radius: 1px; background-color: #1e63b4; }
+.sweep-fill { width: 100%; transform-origin: left center; height: 2px; border-radius: 1px; background-color: #5c96ed; }
 
 .drawer-scrim { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background-color: #14171a; z-index: 44; }
-.drawer {transition-property: transform; position: fixed; left: 0; top: 0; bottom: 0; width: 300px; z-index: 45; 
-  border-style: solid; border-width: 0 1px 0 0;  padding: 28px 18px 22px; flex-direction: column;  background-color: #edf2f6; border-color: #d7e1e9; }
-.drawer-head { flex-direction: row; align-items: center; }
-.drawer-badge { width: 40px; height: 40px; border-radius: 12px; background-color: #1e63b4; align-items: center; justify-content: center; margin-right: 12px; }
+.drawer { transition-property: transform; position: fixed; left: 0; top: 0; bottom: 0; width: 300px; z-index: 45; border-style: solid; border-width: 0 1px 0 0; padding: 28px 18px 22px; flex-direction: column; background-color: #e6efff; border-color: rgba(255,255,255,0.8); box-shadow: 12px 0 40px rgba(27,54,109,0.16); }
+.drawer-head { position: relative; flex-shrink: 0; height: 166px; justify-content: flex-end; padding-bottom: 16px; }
+.drawer-badge { width: 46px; height: 46px; border-radius: 17px; background-color: #4b7be0; align-items: center; justify-content: center; margin-right: 12px; background-image: linear-gradient(to bottom right,#70caff,#5a77e2); border: 1px solid rgba(255,255,255,0.7); }
 .drawer-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
-.drawer-title {font-weight: 600;   color: #29465f; font-size: 17px; }
-.drawer-sub {font-size: 11px;  margin-top: 4px;  color: #63798c; }
-.drawer-rule {height: 1px;  margin: 24px 0 14px;  background-color: #d5e0e9; }
-.drawer-body { flex: 1; }
-.drawer-item { flex-direction: row; align-items: center; height: 48px; padding: 0 12px; border-radius: 14px; margin-bottom: 8px; }
-.drawer-item-on {background-color: #dce7f0; }
+.drawer-title { font-weight: 600; color: #203f76; font-size: 17px; }
+.drawer-sub { font-size: 11px; margin-top: 4px; color: #536b97; }
+.drawer-rule { position: relative; flex-shrink: 0; height: 1px; margin: 0 0 12px; background-color: rgba(255,255,255,0.7); }
+.drawer-body { position: relative; flex: 1; }
+.drawer-item { position: relative; flex-direction: row; align-items: center; height: 54px; padding: 0 10px; border-radius: 18px; margin-bottom: 8px; background-color: rgba(242,249,255,0.74); }
+.drawer-item-on { background-color: rgba(255,255,255,0.65); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 4px 14px rgba(57,83,151,0.07); }
 .drawer-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #93aacb; margin-right: 12px; }
-.drawer-dot-on {background-color: #567fa6; }
-.drawer-label {font-size: 14px;  flex: 1;  color: #526b81; }
-.drawer-label-on {font-weight: 600;  color: #294d70; }
+.drawer-dot-on { background-color: #4d7cdc; }
+.drawer-label { font-size: 14px; flex: 1; color: #425e8b; }
+.drawer-label-on { font-weight: 700; color: #2d57a0; }
 .drawer-note {font-size: 11px;  letter-spacing: 1px;  color: #62798d; }
-.shield-row {position: relative; flex-direction: row; align-items: center; padding: 12px; border-radius: 16px;  margin-bottom: 12px;  background-color: #dfe8f0; }
+.shield-row { position: relative; flex-direction: row; align-items: center; padding: 12px; border-radius: 22px; margin-bottom: 12px; background-color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.72); }
 .shield-copy { flex: 1; }
-.shield-title {font-size: 14px; font-weight: 600;   color: #30485e; }
-.shield-note {font-size: 11px;  margin-top: 4px;  color: #63798c; }
+.shield-title { font-size: 14px; font-weight: 600; color: #274572; }
+.shield-note { font-size: 11px; margin-top: 4px; color: #526b92; }
 .shield-note-off {color: #63798c; }
 .shield-switch { margin-left: 8px; min-width: 44px; min-height: 44px; }
 .switch { width: 44px; height: 26px; border-radius: 13px; background-color: #d2ddec; padding: 4px; }
 .switch-on { background-color: #12805d; }
 .switch-knob { width: 20px; height: 20px; border-radius: 10px; background-color: #ffffff; }
-.drawer-version {font-size: 11px;  letter-spacing: 1px;  color: #63798c; }
+.drawer-version { font-size: 11px; letter-spacing: 0; color: #56719c; }
 
-.section-heading {flex-direction: row;  justify-content: space-between;  margin-top: 22px; margin-bottom: 10px; align-items: center; }
-.section-title {font-weight: 600;   color: #304c65; font-size: 16px; }
-.section-count {color: #61798d; font-size: 12px; }
+.section-heading { flex-direction: row; justify-content: space-between; margin-top: 24px; margin-bottom: 12px; align-items: center; }
+.section-title { font-weight: 700; color: #203d70; font-size: 16px; }
+.section-count { color: #3f5e91; font-size: 12px; }
 
 .timeline { flex-direction: row; margin-bottom: 16px; }
 .timeline-seg { flex: 1; padding-right: 8px; }
@@ -1086,34 +1192,34 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 .seg-node-done { background-color: #1fa97c; }
 .seg-label { font-size: 11px; color: #9db4d4; margin-left: 8px; }
 .seg-label-on { color: #ffffff; font-weight: 400; }
-.swipe-hint {font-size: 11px;  text-align: center;   color: #6b8092; line-height: 18px; margin-top: 8px; }
+.swipe-hint { font-size: 12px; text-align: center; color: #395881; line-height: 18px; margin-top: 8px; }
 
 .stack { position: relative; }
-.stack-card {position: absolute; left: 0; right: 0; height: 96px; border-radius: 18px; padding: 16px 18px; flex-direction: row; align-items: center; border-style: solid; border-width: 1px;  transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1);  border-color: #d5e0e9; }
-.stack-first {background-color: #f8fafb; }
-.stack-second {background-color: #f1f5f8; }
-.stack-third {background-color: #e3ebf2; }
-.stack-chip {width: 38px; height: 38px; border-radius: 12px;  align-items: center; justify-content: center;  background-color: #e3edf5; }
-.stack-glyph { font-size: 18px; color: #1e63b4; }
+.stack-card { position: absolute; left: 0; right: 0; height: 96px; border-radius: 26px; padding: 16px 18px; flex-direction: row; align-items: center; box-shadow: 0 6px 20px rgba(59,81,164,0.10); transition-property: transform; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1); border: 1px solid rgba(255,255,255,0.72); }
+.stack-first { background-color: rgba(246,251,255,0.86); }
+.stack-second { background-color: #dfebff; }
+.stack-third { background-color: #ccdfff; }
+.stack-chip { width: 30px; height: 30px; border-radius: 11px; align-items: center; justify-content: center; background-color: #d7e8ff; }
+.stack-glyph { color: #3767ce; font-size: 17px; }
 .stack-copy { flex: 1; margin: 0 12px; }
 .stack-chev { font-size: 18px; color: #9aa4b2; transition-property: transform; transition-duration: 260ms; }
 .stack-chev-open { transform: rotate(90deg); }
 
-.detail-title {font-size: 15px; font-weight: 600; line-height: 23px;  color: #30485e; }
-.footnote {font-size: 12px;   margin-top: 20px;  color: #62798d; line-height: 20px; }
+.detail-title { font-size: 15px; font-weight: 600; line-height: 23px; color: #253e70; }
+.footnote { font-size: 12px; margin-top: 20px; color: #35547c; line-height: 21px; }
 
 .field-label { color: #c7d8f0; font-size: 14px; letter-spacing: 1px; margin-bottom: 8px; margin-top: 16px; }
 .input { background-color: #ffffff; border-style: solid; border-width: 1px; border-color: #dfe7f2; border-radius: 14px; padding: 16px 16px; color: #1c2023; font-size: 14px; min-height: 56px; }
-.field-note {font-size: 12px;  margin-top: 8px;  color: #62798d; line-height: 20px; }
+.field-note { font-size: 12px; margin-top: 8px; color: #526b92; line-height: 20px; }
 .fingerprint { height: 96px; width: 100%; }
-.text-link {font-size: 14px;   align-self: flex-end;  color: #42698e; margin-top: 8px; min-height: 28px; }
+.text-link { font-size: 14px; align-self: flex-end; color: #3b6ac5; margin-top: 8px; min-height: 28px; font-weight: 600; }
 .form-action { margin-top: 24px; }
-.divider {height: 1px;  margin: 24px 0;  background-color: #d3dfe8; }
+.divider { height: 1px; margin: 24px 0; background-color: rgba(88,118,175,0.16); }
 .compact { margin: 4px 0 6px; }
 .list-row { min-height: 66px; flex-direction: row; align-items: center; justify-content: space-between; }
 .card-link { color: #1e63b4; font-size: 14px; }
 
-.pref-hero {flex-direction: row; align-items: center;  border-radius: 20px;  border-style: solid; border-width: 1px; border-color: #dfe7f2; transition-property: background-color; transition-duration: 320ms;  background-color: #f7f9fb; padding: 18px 14px; }
+.pref-hero {flex-direction: row; align-items: center; border-radius: 28px; box-shadow: 0 4px 16px rgba(40,66,86,0.06); transition-property: background-color; transition-duration: 320ms; background-color: #f7f9fb; padding: 18px 14px; }
 .pref-hero-0 {background-color: #f4f7f9; }
 .pref-hero-1 {background-color: #edf3f7; }
 .pref-hero-2 {background-color: #e5eef5; }
@@ -1123,24 +1229,24 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 .pref-title { font-size: 18px; font-weight: 600; color: #14171a; margin-top: 8px; }
 .pref-note { margin-top: 4px; }
 
-.preference-card {margin-top: 16px; padding: 8px 18px; border-radius: 18px; border-style: solid; border-width: 1px; border-color: #dfe7f2;   background-color: #f8fafb; }
+.preference-card { margin-top: 16px; padding: 8px 18px; border-radius: 28px; box-shadow: 0 6px 20px rgba(59,81,164,0.08); background-color: rgba(247,251,255,0.88); border: 1px solid rgba(255,255,255,0.8); }
 .check-row { min-height: 72px; flex-direction: row; align-items: center; }
 .child-row { margin-left: 4px; }
-.tickbox { width: 23px; height: 23px; border-radius: 7px; border-style: solid; border-width: 1.5px; border-color: #ccd9ea; align-items: center; justify-content: center; margin-right: 16px; background-color: #ffffff; }
-.tickbox-on { background-color: #1e63b4; border-color: #1e63b4; }
+.tickbox { width: 23px; height: 23px; border-radius: 7px; border-style: solid; border-width: 1.5px; border-color: #aac2ed; align-items: center; justify-content: center; margin-right: 16px; background-color: #f8fbff; }
+.tickbox-on { background-color: #4a7dde; border-color: #4a7dde; }
 .tick-mark { font-size: 14px; font-weight: 600; color: #ffffff; transition-property: transform,opacity; transition-duration: 180ms; }
 .row-copy { flex: 1; }
-.speed-row {margin-top: 16px; padding: 16px 18px; border-radius: 16px; border-style: solid; border-width: 1px; border-color: #dfe7f2;   background-color: #f8fafb; }
+.speed-row { margin-top: 16px; padding: 16px 18px; border-radius: 26px; box-shadow: 0 6px 20px rgba(59,81,164,0.08); background-color: rgba(247,251,255,0.88); border: 1px solid rgba(255,255,255,0.8); }
 .speed-value { flex-direction: row; align-items: center; }
-.speed-label { font-size: 14px; color: #1e63b4; font-weight: 400; }
-.speed-mult { font-size: 11px; color: #555c62; margin-left: 8px; }
+.speed-label { font-size: 14px; color: #396bca; font-weight: 400; }
+.speed-mult { width: 34px; text-align: right; font-size: 11px; color: #555c62; margin-left: 8px; }
 
 .about-brand { flex-direction: row; align-items: center; margin-bottom: 20px; }
 .about-version {font-size: 14px;   color: #63798c; margin-top: 5px; }
 .about-mark { width: 44px; height: 44px; border-radius: 13px; background-color: #14171a; align-items: center; justify-content: center; margin-right: 16px; }
 .about-letter { color: #f0f5fd; font-size: 14px; font-weight: 600; }
-.about-card {border-radius: 18px;  border-style: solid; border-width: 1px; border-color: #dfe7f2; margin-bottom: 12px;  background-color: #f8fafb; padding: 20px; }
-.example { font-size: 14px; line-height: 25px; color: #1c2023; background-color: #f0f5fd; padding: 16px 16px; border-radius: 12px; margin: 12px 0 12px; }
+.about-card { border-radius: 28px; box-shadow: 0 6px 20px rgba(59,81,164,0.08); margin-bottom: 12px; background-color: rgba(248,252,255,0.9); padding: 20px; border: 1px solid rgba(255,255,255,0.8); }
+.example { font-size: 14px; line-height: 25px; color: #2a4c86; background-color: #dfedff; padding: 16px 16px; border-radius: 18px; margin: 12px 0 12px; }
 .paragraph { line-height: 23px; margin-top: 8px; }
 
 .tabbar { position: relative; z-index: 1; height: 64px; flex-direction: row; align-items: center; padding: 0 10px; background-color: #0a1a30; }
@@ -1172,7 +1278,7 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 .sheet-sub { text-align: center; margin-top: 4px; margin-bottom: 4px; }
 .sheet-actions { margin-top: 8px; }
 .detail-veil { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(16,20,18,0.28); z-index: 70; }
-.detail-panel { position: fixed; z-index: 71; border-radius: 26px; background-color: #ffffff; padding: 0; overflow: hidden; border-style: solid; border-width: 1px; border-color: #e6e9e4; flex-direction: column; transition-property: transform, opacity; }
+.detail-panel { position: fixed; z-index: 71; border-radius: 26px; background-color: #eaf3ff; padding: 0; overflow: hidden; border-style: solid; border-width: 1px; border-color: rgba(255,255,255,0.9); flex-direction: column; transition-property: transform, opacity; }
 .detail-top { flex-direction: row; align-items: center; justify-content: space-between; }
 .detail-kicker { font-size: 11px; letter-spacing: 2px; color: #555c62; }
 .detail-close { font-size: 14px; color: #555c62; padding: 4px 6px; min-width: 44px; min-height: 44px; text-align: center; }
@@ -1187,7 +1293,30 @@ function showLicense() { uni.showModal({ title: '开源组件', content: 'Java-W
 .detail-note { font-size: 11px; color: #555c62; text-align: center; }
 .detail-cta { margin-top: 12px; height: 52px; border-radius: 16px; background-color: #14171a; align-items: center; justify-content: center; }
 .detail-cta-text { color: #f0f5fd; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
-.on-sky-title {color: #30485e; }
-.on-sky-note {color: #63798c; }
-.on-sky-link {color: #42698e; }
+.on-sky-title { color: #253e70; }
+.on-sky-note { color: #536a92; }
+.on-sky-link { color: #396bca; }
+
+.connection-form { padding: 20px 18px; border-radius: 28px; background-color: rgba(248,252,255,0.90); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 28px rgba(43,72,152,0.10); }
+.form-heading { flex-direction: row; align-items: center; margin-bottom: 6px; }
+.form-step { width: 36px; height: 36px; border-radius: 13px; background-color: #deebff; margin-right: 12px; align-items: center; justify-content: center; }
+.form-step-text { color: #4176d1; font-size: 12px; font-weight: 700; }
+.device-id-row { margin-top: 16px; padding: 14px 18px; border: 1px solid rgba(255,255,255,0.7); border-radius: 24px; background-color: rgba(241,248,255,0.8); }
+
+
+
+.portrait-zone { flex-shrink: 0; position: relative; padding: 10px 20px 0; }
+.portrait-copy { position: relative; }
+.drawer-foot { position: relative; flex-shrink: 0; padding-top: 12px; }
+.drawer-menu-icon { width: 32px; height: 36px; margin-right: 10px; flex-shrink: 0; }
+.drawer-brand-copy { width: 158px; }
+.drawer-signals { padding: 12px 0 18px; }
+.signals-title { color: #314f81; font-size: 12px; font-weight: 600; margin: 2px 4px 10px; }
+.signal-row { flex-direction: row; margin-bottom: 7px; }
+.signal-card { flex: 1; padding: 7px 2px 9px; margin: 0 3px; border-radius: 18px; align-items: center; background-color: rgba(241,247,255,0.83); border: 1px solid rgba(255,255,255,0.65); }
+.signal-on { background-color: rgba(210,232,255,0.88); border-color: #ffffff; }
+.signal-art { width: 48px; height: 48px; }
+.signal-title { color: #35537c; font-size: 11px; line-height: 17px; margin-top: 3px; }
+.signal-note { color: #587297; font-size: 10px; line-height: 16px; }
+.shield-art { width: 26px; height: 34px; margin-right: 7px; flex-shrink: 0; }
 </style>

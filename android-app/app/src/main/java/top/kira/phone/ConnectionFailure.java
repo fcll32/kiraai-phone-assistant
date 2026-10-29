@@ -28,7 +28,7 @@ final class ConnectionFailure {
             return "服务器证书验证失败。请检查证书、地址、校验码和两端时间。原因：" + detail;
         }
         if (wrongProtocol(text)) {
-            return "端口可能接到了普通 HTTP 或其他非 TLS 服务。请把手机端口映射到插件的加密监听端口，不是 KiraAI 管理端口 5267。原因：" + detail;
+            return "端口可能接到了普通 HTTP 或其他非 TLS 服务。请核对加密入口的映射；共用入口通常为公网 5267 → 容器 8443，不能仍接到容器内的普通 HTTP 5267。原因：" + detail;
         }
         if (text.contains("503") || text.contains("service unavailable")) {
             return "服务器暂时拒绝连接：可能已有另一台手机在线，或连接数已满。正在重试…";

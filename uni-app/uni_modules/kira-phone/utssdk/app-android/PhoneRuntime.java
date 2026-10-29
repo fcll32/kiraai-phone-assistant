@@ -20,6 +20,9 @@ public final class PhoneRuntime {
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences("connection", Context.MODE_PRIVATE);
     }
+    private static boolean screenProtected(SharedPreferences settings) {
+        return settings.getBoolean("screen_protected", false);
+    }
     public static String state(Context context) {
         try {
             SharedPreferences settings = prefs(context);
@@ -38,7 +41,7 @@ public final class PhoneRuntime {
                 .put("address", ServerAddress.display(settings.getString("url", "")))
                 .put("version", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName)
                 .put("reducedMotion", settings.getBoolean("reduced_motion", false))
-                .put("screenProtected", settings.getBoolean("screen_protected", true))
+                .put("screenProtected", screenProtected(settings))
                 .put("secureConfigured", settings.contains("screen_protected"))
                 .put("animationSpeed", settings.getInt("animation_speed", 1)).toString();
         } catch (Exception error) { throw new IllegalStateException("无法读取手机状态", error); }
@@ -83,7 +86,7 @@ public final class PhoneRuntime {
         activity.startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
     }
     public static void secure(Activity activity) {
-        applySecure(activity, prefs(activity).getBoolean("screen_protected", true), false);
+        applySecure(activity, screenProtected(prefs(activity)), false);
     }
     public static boolean secure(Activity activity, boolean enabled) {
         return applySecure(activity, enabled, true);

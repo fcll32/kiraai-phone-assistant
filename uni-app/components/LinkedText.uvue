@@ -1,0 +1,31 @@
+<template>
+  <view class="linked-line" :style="{ height: (lineHeight * lines) + 'px' }">
+    <text class="linked-value" :lines="lines" :style="textStyle" aria-live="polite">{{ displayed }}</text>
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { createTimeoutScope } from '@/lib/timers.js'
+const props = defineProps({ value: { type: String, default: '' }, duration: { type: Number, default: 700 }, active: { type: Boolean, default: true }, fontSize: { type: Number, default: 21 }, lineHeight: { type: Number, default: 29 }, lines: { type: Number, default: 1 }, color: { type: String, default: '#29465f' }, weight: { type: String, default: '400' } })
+const displayed = ref(props.value), phase = ref(0), phaseMs = ref(0)
+const timers = createTimeoutScope()
+const textStyle = computed(() => ({ fontSize: props.fontSize + 'px', lineHeight: props.lineHeight + 'px', color: props.color, fontWeight: props.weight, transform: 'translateY(' + (phase.value === 0 ? 0 : 12) + 'px)', opacity: phase.value === 0 ? 1 : 0, transitionDuration: phaseMs.value + 'ms' }))
+function finish() { timers.clear(); displayed.value = props.value; phase.value = 0; phaseMs.value = 0 }
+function update() {
+  timers.clear()
+  if (!props.active || !props.duration || props.value === displayed.value) { finish(); return }
+  const half = Math.max(1, Math.round(props.duration / 2))
+  phaseMs.value = half; phase.value = 1
+  timers.after(() => {
+    displayed.value = props.value; phaseMs.value = 0; phase.value = 2
+    timers.after(() => { phaseMs.value = half; phase.value = 0; timers.after(finish, half) }, 16)
+  }, half)
+}
+watch(() => props.value, update)
+watch(() => [props.active, props.duration], () => { if (!props.active || !props.duration) finish(); else update() })
+onUnmounted(() => timers.dispose())
+</script>
+<style>
+.linked-line { overflow: hidden; }
+.linked-value { transition-property: transform,opacity; transition-timing-function: cubic-bezier(0.22,1,0.36,1); }
+</style>

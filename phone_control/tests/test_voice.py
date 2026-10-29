@@ -79,6 +79,24 @@ async def utterance(ws, turn="turn-1", pcm=b"\0\0" * 1600):
 
 
 @pytest.mark.asyncio
+async def test_long_chinese_transcript_fits_android_text_limit(voice_server):
+    text = "中" * 3000
+    async def reply(call, pcm, turn):
+        await call.send({"type": "transcript", "role": "assistant", "text": text}, turn=turn)
+    voice_server[0].voice.backend.run.side_effect = reply
+    ws, welcome = await connect(voice_server)
+    try:
+        assert welcome["type"] == "welcome"
+        await ws.receive_json(timeout=3)
+        await utterance(ws)
+        raw = await ws.receive_str(timeout=3)
+        assert json.loads(raw)["text"] == text
+        assert len(raw) <= 16384
+    finally:
+        await ws.close()
+
+
+@pytest.mark.asyncio
 async def test_turn_error_returns_to_listening_without_hanging_up(voice_server):
     plugin = voice_server[0]
     plugin.voice.backend.run.side_effect = PhoneError("没有听清，请再说一次")

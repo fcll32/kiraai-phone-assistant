@@ -99,13 +99,13 @@ onUnmounted(() => { if (timer != null) clearInterval(timer); emit('settling', fa
 
 <style>
 .wheel { position: relative; height: 168px; overflow: hidden; }
-.wheel-band { pointer-events: none; position: absolute; left: 0; right: 0; top: 56px; height: 56px; border-radius: 16px; background-color: #eef4fd; border-style: solid; border-width: 1px; border-color: #dbe6f4; }
+.wheel-band { pointer-events: none; position: absolute; left: 0; right: 0; top: 56px; height: 56px; border-radius: 18px; background-color: #dceaff; border-style: solid; border-width: 1px; border-color: rgba(255,255,255,0.85); }
 .wheel-strip { position: absolute; left: 0; right: 0; top: 0; flex-direction: column; }
 .wheel-row { flex-shrink: 0; height: 56px; flex-direction: row; align-items: center; justify-content: center; }
 .wheel-label { font-size: 14px; color: #555c62; }
-.wheel-label-on { font-size: 18px; color: #14171a; font-weight: 600; }
+.wheel-label-on { font-size: 18px; color: #2a5399; font-weight: 600; }
 .wheel-mult { margin-left: 8px; font-size: 11px; color: #555c62; }
-.wheel-mult-on { color: #1e63b4; }
+.wheel-mult-on { color: #497bd2; }
 .wheel-tick-area { pointer-events: none; position: absolute; right: 14px; top: 56px; height: 56px; justify-content: space-between; }
 .wheel-tick { width: 10px; height: 2px; border-radius: 1px; background-color: #d5e1f2; }
 .wheel-tick-on { width: 16px; background-color: #1e63b4; }

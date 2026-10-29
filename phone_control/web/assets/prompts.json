@@ -1,0 +1,87 @@
+{
+  "engine": "built-in image_gen",
+  "purpose": "Plugin-only character artwork; App assets unchanged",
+  "references": {
+    "character": "uni-app/static/kira-wallpaper.jpg",
+    "chibiStyle": "uni-app/static/companions/link.png"
+  },
+  "assets": [
+    {
+      "asset": "scene-settings.png",
+      "kind": "scene",
+      "prompt": "Use case: illustration-story. Asset: a single 2:3 portrait illustration for KiraAI phone assistant plugin server-settings page, NOT a UI mockup. Reference image 1 is the character identity and anime rendering reference. Keep her long periwinkle blue hair with pale lavender highlights, large cyan-blue eyes, white and pale-blue scarf and loose hoodie, gentle blush, clean polished anime cel shading. NEW scene different from the reference: at a softly sunlit blue-lavender home computer desk with a small server tower and keyboard, she looks at the viewer with a calm attentive smile, one hand resting naturally on the keyboard, the other pointing toward a small blue server status light. Medium waist-up framing, both hands completely inside frame with generous margins, entire face visible, correct natural hands, no props crossing face. Background broad soft blue and lavender blocks, few details, daylight, quiet welcoming atmosphere. Character occupies middle of the portrait with breathing room all around. No text, logo, watermark, app interface, labels or extra people. Full opaque background. No UI content is to be drawn on this image.",
+      "generated_file": "exec-ab0fef38-01b8-482a-86ee-eb5491685724.png",
+      "transparent_background": false
+    },
+    {
+      "asset": "scene-pairing.png",
+      "kind": "scene",
+      "prompt": "Use case: illustration-story. Asset: a single 2:3 portrait illustration for KiraAI phone assistant plugin phone-pairing page, NOT a UI mockup. Reference image 1 is character identity and polished anime style reference. Preserve her long periwinkle-blue hair, pale lavender highlights, bright cyan eyes, white/pale-blue scarf and loose hoodie. NEW pose/scene: seated beside a large soft blue window, holding a smartphone at chest height in one hand with the front blue-glowing screen visible, her other hand makes a small welcoming open-palm gesture beside the phone. She has a warm relieved smile with both eyes open, clearly different from neutral reference expression. Waist-up shot, entire head, full face, both complete hands and phone all inside frame with generous margins. Five natural fingers per hand. Minimal light lavender room, airy blue reflections, soft daylight, broad quiet shapes. Gentle cel shading, delicate linework, same palette as reference. No lettering, text, watermark, logos, interface, extra people or phones hiding her face. Opaque background.",
+      "generated_file": "exec-ace84581-6008-4d80-b19a-714a15e40043.png",
+      "transparent_background": false
+    },
+    {
+      "asset": "scene-guide.png",
+      "kind": "scene",
+      "prompt": "Use case: illustration-story. Asset: one 2:3 portrait anime illustration for KiraAI phone assistant plugin installation-guide page, NOT a UI mockup. Reference image 1 provides the exact character and rendering style: long periwinkle blue hair with lavender highlights, cyan-blue eyes, pale skin with soft blush, white/pale-blue scarf and loose hoodie, polished clean cel shading. NEW scene and action: she stands by a pale-blue bookshelf in a calm lavender study, holding an open instruction booklet in one hand at lower chest and raising the other index finger beside it as if gently explaining the next step. Friendly playful expression: one eye softly winking, the other bright cyan eye looking toward viewer, small encouraging smile. Entire face and both complete hands visible, waist-up framing with ample margins around fingertips, correct anatomy. Books have no writing, few broad background shapes, diffuse daylight, blue/lavender palette matching reference, no clutter. No text, labels, watermark, logos, UI, other people; booklet does not cover face. Opaque background.",
+      "generated_file": "exec-fd35bc30-6e20-40de-be3c-398dbf2d4eee.png",
+      "transparent_background": false
+    },
+    {
+      "asset": "settings.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: server SETTINGS. Action: she holds one large simple blue cogwheel at chest in one hand and gently turns it with a small blue wrench in the other. Expression: focused slightly pursed lips, attentive open eyes, slight head tilt. Keep the tools big and legible, hands anatomically correct, no props across face.",
+      "generated_file": "exec-38a9fe26-bb5d-4d68-8e13-bc790e90625b.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "link.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: phone PAIRING / waiting to connect. Action: hugging a small smartphone with one hand, other hand points toward one bold blue wireless arc symbol beside the phone. Expression: curious hopeful open eyes and a tiny expectant smile, one small anticipation sparkle. Front screen of phone visible, not covering face. No plugs.",
+      "generated_file": "exec-1d18eb43-1c09-4e2a-bc4d-b80bf52e545e.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "guide.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: INSTALLATION GUIDE. Action: holds a clearly open blue instruction booklet at lower chest and raises an index finger beside it to explain. Expression: friendly confident wink and encouraging smile. No writing in booklet. Keep all of face, raised finger and book visible and separated.",
+      "generated_file": "exec-7f4cd577-4392-4335-b309-249549276472.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "call.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: APP VOICE CALL. Action: wears a rounded blue headset with visible tiny microphone, one hand cups an ear pad while other hand gives a small friendly wave. Expression: cheerful speaking smile, both cyan eyes warmly open, two tiny clean blue sound rays near microphone. Hands stay away from facial features.",
+      "generated_file": "exec-a7e469f3-d731-44e6-b45c-1de612e4f1ab.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "shield.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: ALLOWED CHAT PERMISSIONS. Action: holds one broad simple translucent blue shield firmly in both hands at chest, like guarding access. Expression: reassuring determined small smile, relaxed eyebrows, both eyes open. Shield has one clear check-shaped cutout, not lettering. Face fully visible.",
+      "generated_file": "exec-5e9d7df9-97ee-4114-80b9-64c7c2d59588.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "connected.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: PHONE CONNECTED SUCCESSFULLY. Action: she enthusiastically gives a clear thumbs-up with one hand, other holds a smartphone showing a single large blue check mark. Expression: delighted closed-eye crescent smile, slightly rosy cheeks, two tiny blue sparkles. Not a wink, no tears or sweat. Face and hands clearly separated.",
+      "generated_file": "exec-bf83fa5b-47a3-403b-b353-071e0628c67c.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "rest.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square transparent-background Q-version anime character sticker for a KiraAI phone assistant plugin functional icon, readable at 34-40px. Image 1: exact character identity/color reference. Image 2: chibi rendering reference ONLY, create a clearly new pose and expression rather than copying its plugs pose. Preserve long periwinkle blue hair with pale lavender highlights, large vivid cyan-blue eyes, white and pale-blue scarf and loose hoodie, clean polished cel shading, cute chibi proportions, simple bold silhouette with delicate white sticker contour. All hair, props, complete hands inside frame with a small transparent margin. Single character, no scene, no text, lettering, watermark or logos, no multiple panels. Real alpha transparency. Function: SERVER STOPPED / QUIET IDLE, not an error. Action: she cradles a little blue teacup in both hands below her scarf, relaxed shoulders. Expression: peaceful half-lidded cyan eyes and small content smile, tiny curl of steam above cup away from face. Calm awake resting, no sleep letters or written symbols. Hands correctly holding cup, face completely clear.",
+      "generated_file": "exec-172a37cf-26f6-4ff5-9e34-9011689a06b6.png",
+      "transparent_background": true
+    },
+    {
+      "asset": "error.png",
+      "kind": "sticker",
+      "prompt": "Use case: stylized-concept. Asset: one square truly transparent-background Q-version character sticker for the KiraAI phone assistant plugin CONNECTION ERROR status. Image 1 is character identity reference; image 2 chibi style reference. Same long periwinkle blue hair with pale lavender highlights, large cyan eyes, white/pale-blue scarf and loose hoodie, polished anime cel shading, fine white sticker contour. New action: she looks thoughtfully down at a disconnected blue connector in one hand while her other hand gently touches her chin. Expression: mildly puzzled concerned brows, small pursed mouth, both eyes open, one tiny blue question-shaped symbol to side, no crying, smiling, thumbs-up or success symbol. All complete hands, head, connector and hair visible within square with transparent margins. Clear simple silhouette readable at 38px. No background, text, logos, watermark, extra characters or panels. Real alpha transparency, not checkerboard.",
+      "generated_file": "exec-ddd0c8c7-f97e-45d1-a4b6-9182baa872dc.png",
+      "transparent_background": true
+    }
+  ]
+}

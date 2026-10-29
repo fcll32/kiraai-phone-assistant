@@ -1,0 +1,43 @@
+<template>
+  <view class="intro">
+    <view v-if="kicker" class="intro-part" :style="partStyle(0)"><text class="intro-kicker">{{ kicker }}</text></view>
+    <view class="intro-part" :style="partStyle(1)"><text class="intro-title" :style="{ fontSize: fontSize + 'px', lineHeight: lineHeight + 'px' }">{{ heading }}</text></view>
+    <view v-if="description" class="intro-part" :style="partStyle(2)"><text class="intro-description">{{ description }}</text></view>
+    <view class="intro-part" :style="partStyle(3)"><slot /></view>
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { createTimeoutScope } from '@/lib/timers.js'
+import { balanceHeading } from '@/lib/typography.js'
+const props = defineProps({ kicker: { type: String, default: '' }, title: { type: String, default: '' }, description: { type: String, default: '' }, width: { type: Number, default: 346 }, fontSize: { type: Number, default: 25 }, lineHeight: { type: Number, default: 34 }, active: { type: Boolean, default: true }, duration: { type: Number, default: 400 } })
+const heading = computed(() => balanceHeading(props.title, Math.max(6, props.width / props.fontSize)))
+const shown = ref(true), animate = ref(false)
+const timers = createTimeoutScope()
+let revision = 0, disposed = false
+function settle() { revision++; timers.clear(); animate.value = false; shown.value = true }
+function enter() {
+  settle()
+  if (!props.active || props.duration <= 0 || disposed) return
+  const ticket = revision
+  shown.value = false
+  nextTick(() => {
+    if (disposed || ticket !== revision || !props.active || props.duration <= 0) return
+    timers.after(() => { animate.value = true; shown.value = true }, 16)
+  })
+}
+function partStyle(index) {
+  const duration = animate.value ? Math.max(0, props.duration) : 0
+  return { transform: 'translateY(' + (shown.value ? 0 : 8) + 'px)', opacity: shown.value ? 1 : 0, transitionDuration: duration + 'ms', transitionDelay: (duration * index * 0.16) + 'ms' }
+}
+watch(() => props.active, () => { if (props.active) enter(); else settle() }, { immediate: true })
+watch(() => props.duration, () => { if (props.duration <= 0) settle() })
+onUnmounted(() => { disposed = true; settle(); timers.dispose() })
+</script>
+<style>
+.intro { margin-bottom: 20px; padding: 0 2px; }
+.intro-part { transition-property: transform,opacity; transition-timing-function: cubic-bezier(0.22,1,0.36,1); }
+.intro-kicker { color: #365b9b; font-size: 11px; line-height: 18px; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600; }
+.intro-title { color: #1e376c; font-weight: 700; }
+.intro-description { color: #3c5881; font-size: 13px; line-height: 22px; margin-top: 7px; }
+</style>

@@ -3,7 +3,6 @@ import base64
 import io
 import json
 import shlex
-import shutil
 import sys
 from dataclasses import fields
 from pathlib import Path
@@ -91,6 +90,27 @@ async def test_native_screenshot_uses_real_framework_media_references(plugin):
         assert preview.size == (576, 1280)
     sent_chain = plugin.ctx.send_message_chain.call_args.args[1]
     assert isinstance(sent_chain.message_list[0], Image)
+
+
+@pytest.mark.asyncio
+async def test_stopped_plugin_does_not_deliver_late_screenshot(plugin):
+    ready, release = asyncio.Event(), asyncio.Event()
+    screen = decode_screen(png(), 1280)
+
+    async def capture(*args):
+        ready.set()
+        await release.wait()
+        return screen
+
+    plugin.transport.screenshot.side_effect = capture
+    capture_task = asyncio.create_task(plugin.phone_screenshot(make_event(), send_to_chat=True))
+    await ready.wait()
+    await plugin.terminate()
+    release.set()
+    data = unpack(await capture_task)
+    assert not data['ok'] and '停止' in data['error']
+    assert not plugin._frames
+    plugin.ctx.send_message_chain.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -288,11 +308,10 @@ async def test_vlm_description_mode(plugin, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_real_plugin_loader_registers_schema_and_tools(tmp_path):
-    destination = tmp_path / "plugins" / "phone_control"
-    destination.mkdir(parents=True)
-    for name in ("main.py", "adb.py", "protocol.py", "media.py", "remote.py", "server.py", "voice.py", "__init__.py", "manifest.json", "schema.json"):
-        shutil.copyfile(PLUGIN_ROOT / name, destination / name)
-    shutil.copytree(PLUGIN_ROOT / "web", destination / "web")
+    from core.plugin.plugin_installer import install_from_zip
+    from scripts.package_plugin import build_plugin
+
+    destination = await install_from_zip(build_plugin(tmp_path).read_bytes(), tmp_path / "plugins")
     ctx = make_context()
     manager = PluginManager(ctx)
     ctx.plugin_mgr = manager
@@ -406,3 +425,32 @@ async def test_timeout_or_cancellation_reaps_real_subprocess(monkeypatch, cancel
             await task
     assert not adb.processes
     assert spawned[0].returncode is not None
+
+
+@pytest.mark.asyncio
+async def test_stop_during_subprocess_creation_reaps_late_process(monkeypatch):
+    original = asyncio.create_subprocess_exec
+    starting, release = asyncio.Event(), asyncio.Event()
+    spawned = []
+
+    async def start(*args, **kwargs):
+        starting.set()
+        await release.wait()
+        process = await original(sys.executable, '-c', 'import time; time.sleep(30)', **kwargs)
+        spawned.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, 'create_subprocess_exec', start)
+    adb = AdbClient({})
+    command = asyncio.create_task(adb.run('devices'))
+    await starting.wait()
+    await adb.close()
+    release.set()
+    try:
+        with pytest.raises(PhoneError, match='停止'):
+            await asyncio.wait_for(command, 2)
+        assert not adb.processes
+        assert spawned[0].returncode is not None
+    finally:
+        command.cancel()
+        await asyncio.gather(command, return_exceptions=True)

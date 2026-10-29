@@ -14,6 +14,7 @@ from uuid import uuid4
 from aiohttp import web, WSMsgType
 
 from .protocol import PhoneError, valid_password
+from .gateway import WebUIProxy
 from .voice import VOICE_PATH, MAX_CHUNK_BYTES
 
 DEVICE_PATH = "/ws/plugin/phone_control/device"
@@ -118,7 +119,9 @@ class PhoneSocket:
         return message.data
 
     async def send_json(self, value):
-        await self.ws.send_json(value)
+        # Android accepts UTF-8 JSON. Avoid expanding Chinese/emoji into ASCII
+        # escapes, which wastes bandwidth and can exceed its text-frame limit.
+        await self.ws.send_str(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
 
     async def receive(self):
         message = await self.ws.receive()
@@ -147,16 +150,25 @@ class PhoneServer:
         self.expires = ""
         self.host = ""
         self.port = 0
+        self.webui_proxy = None
+        self.accept_connections = True
 
-    async def start(self, host, port, identity):
+    async def start(self, host, port, identity, *, webui_port=None):
         self.host, self.port = validate_settings(host, port)
+        if webui_port == port:
+            raise PhoneError("加密入口内部端口不能与 Kira 管理网页端口相同；Docker 请使用公网 5267 → 容器 8443")
         context, self.fingerprint, self.expires = await asyncio.to_thread(
             prepare_certificate, self.directory, self.host, identity)
         app = web.Application(client_max_size=4096)
         app.router.add_get(DEVICE_PATH, self._accept)
         if self.voice is not None:
             app.router.add_get(VOICE_PATH, self._accept_voice)
-        runner = web.AppRunner(app, access_log=None, shutdown_timeout=2)
+        if webui_port is not None:
+            self.webui_proxy = WebUIProxy(webui_port)
+            app.router.add_route("*", "/{path:.*}", self.webui_proxy.handle)
+        # Forward the original encoded upload together with its Content-Encoding
+        # and Content-Length. Decoding here would corrupt the upstream request.
+        runner = web.AppRunner(app, access_log=None, shutdown_timeout=2, auto_decompress=False)
         await runner.setup()
         try:
             bind_host = "::" if ipaddress.ip_address(self.host).version == 6 else "0.0.0.0"
@@ -164,12 +176,15 @@ class PhoneServer:
             await self.site.start()
         except BaseException:
             await runner.cleanup()
+            if self.webui_proxy:
+                await self.webui_proxy.close()
+                self.webui_proxy = None
             self.site = None
             raise
         self.runner = runner
 
     async def _accept(self, request):
-        if len(self.clients) >= 8 or self.bridge.closed:
+        if len(self.clients) >= 8 or self.bridge.closed or not self.accept_connections:
             raise web.HTTPServiceUnavailable(text="Phone connection unavailable")
         task = asyncio.current_task()
         self.clients.add(task)
@@ -181,6 +196,9 @@ class PhoneServer:
             self.clients.discard(task)
 
     async def close(self):
+        if self.webui_proxy:
+            await self.webui_proxy.close()
+            self.webui_proxy = None
         if self.site:
             await self.site.stop()
             self.site = None
@@ -194,7 +212,7 @@ class PhoneServer:
             self.runner = None
 
     async def _accept_voice(self, request):
-        if len(self.clients) >= 8 or self.bridge.closed:
+        if len(self.clients) >= 8 or self.bridge.closed or not self.accept_connections:
             raise web.HTTPServiceUnavailable(text="Phone connection unavailable")
         task = asyncio.current_task()
         self.clients.add(task)

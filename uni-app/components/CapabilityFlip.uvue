@@ -56,11 +56,11 @@ onUnmounted(stop)
 </script>
 <style>
 .capability { margin-top: 24px; }
-.flip-card {height: 278px;  border-radius: 24px;  background-color: #f4f8fa; border: 1px solid #d4e0ea; }
+.flip-card { height: 278px; border-radius: 30px; background-color: #edf5ff; box-shadow: 0 7px 24px rgba(50,75,156,0.12); border: 1px solid rgba(255,255,255,0.8); }
 .flip-face { padding: 24px; flex: 1; }
-.flip-kicker { font-size: 12px; color: #486f99; }
-.flip-title {font-weight: 600; color: #183b60; margin-top: 10px;  font-size: 21px; }
-.flip-copy { margin-top: 18px; font-size: 14px; line-height: 22px; color: #47617a; }
+.flip-kicker { font-size: 12px; color: #4b7acc; }
+.flip-title { font-weight: 700; color: #22447e; margin-top: 10px; font-size: 21px; }
+.flip-copy { margin-top: 18px; font-size: 14px; line-height: 22px; color: #4b6795; }
 .flip-hint { font-size: 12px; color: #657f9a; margin-top: 18px; }
 .flip-art { height: 125px; align-items: center; justify-content: center; }
 .flip-phone { width: 68px; height: 108px; border: 3px solid #537ead; border-radius: 17px; padding: 15px 12px; transform: rotate(12deg); z-index: 1; background-color: #e2efff; }
@@ -69,8 +69,8 @@ onUnmounted(stop)
 .flip-short { width: 20px; }
 .flip-orbit { position: absolute; width: 140px; height: 70px; border: 1px solid #c5d9f1; border-radius: 70px; transform: rotate(-18deg); }
 .flip-actions { flex-direction: row; margin-top: 14px; transition-property: transform,opacity; }
-.flip-button {flex: 1; height: 44px; border-radius: 15px;  justify-content: center; align-items: center;  background-color: #dfe8f0; }
-.flip-primary {margin-left: 10px;  background-color: #456b90; }
+.flip-button { flex: 1; height: 44px; border-radius: 16px; justify-content: center; align-items: center; background-color: #dbeaff; }
+.flip-primary { margin-left: 10px; background-color: #5384df; background-image: linear-gradient(to bottom right,#62a8ed,#597bd7); }
 .flip-button-text {font-size: 13px;  color: #345978; }
-.flip-primary-text {font-size: 13px; font-weight: 600;  color: #ffffff; }
+.flip-primary-text { font-size: 13px; font-weight: 600; color: #ffffff; }
 </style>

@@ -100,6 +100,28 @@ async def test_real_tls_authentication_commands_and_private_routes(listener):
             assert (await ws.receive_json())["type"] == "heartbeat_ack"
 
 
+@pytest.mark.asyncio
+async def test_control_command_keeps_unicode_compact_over_real_tls(listener):
+    server, bridge, identity, context = listener
+    async with aiohttp.ClientSession() as client:
+        async with client.ws_connect("wss://" + server.address + DEVICE_PATH, ssl=context) as ws:
+            await ws.send_json({"type": "hello", "protocol": 1, "device_id": "test", "token": identity["token"]})
+            await ws.receive_json()
+            text = "中文🙂" * 200
+            task = asyncio.create_task(bridge.action(await bridge.select_device(), "text", {"text": text}, None))
+            try:
+                raw = await ws.receive_str(timeout=3)
+                command = json.loads(raw)
+                await ws.send_json({"type": "result", "id": command["id"], "ok": True, "data": {}})
+                await task
+                assert command["params"]["args"]["text"] == text
+                assert "\\u" not in raw
+                assert len(raw.encode("utf-8")) < len(json.dumps(command).encode("utf-8"))
+            finally:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+
 @pytest.mark.parametrize("host", ["203.0.113.10", "2001:db8::3"])
 def test_certificate_password_and_pin_survive_reload(tmp_path, host):
     identity = load_identity(tmp_path)
@@ -183,21 +205,36 @@ async def test_zip_install_admin_page_setup_and_persistent_reload(tmp_path, monk
     manager.set_web_app(app)
     plugin_id = await manager.load_plugin_from_dir(installed, auto_install=False)
     assert plugin_id == "phone_control"
+    installed_manifest = json.loads((installed / "manifest.json").read_text(encoding="utf-8"))
+    plugin_info = manager._build_plugin_info(plugin_id, installed_manifest)
+    assert plugin_info.icon == (installed / "icon.png").resolve()
+    assert plugin_info.icon.read_bytes() == (installed / "web/assets/plugin-avatar.png").read_bytes()
     token = _create_jwt_token({"sub": "admin", "auth_mode": "enabled", "tv": _access_token_fingerprint(app.state.access_token)})
     try:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client:
             for path in ("/api/plugin/phone_control/setup", "/api/plugin/phone_control/apk", "/page/plugin/phone_control/connect/"):
                 assert (await client.get(path)).status_code == 401
+            assert (await client.get("/page/plugin/phone_control/connect/assets/scene-settings.png")).status_code == 401
             assert (await client.post("/api/plugin/phone_control/setup", json={})).status_code == 401
             client.cookies.set("kira_token", token)
             assert (await client.get("/page/plugin/phone_control/connect/")).status_code == 200
+            # Exercise the installed folder route, not a source-tree preview: all
+            # page resources must travel with the ZIP and keep its authentication.
+            for name in ("panel.css", "panel.js", "assets/scene-settings.png", "assets/scene-pairing.png",
+                         "assets/scene-guide.png", "assets/settings.png", "assets/link.png", "assets/guide.png",
+                         "assets/call.png", "assets/shield.png", "assets/connected.png", "assets/rest.png", "assets/error.png", "assets/plugin-avatar.png"):
+                resource = await client.get("/page/plugin/phone_control/connect/" + name)
+                assert resource.status_code == 200, name
+                assert resource.headers["cache-control"] == "no-store"
+                assert resource.content == (installed / "web" / name).read_bytes()
             apk_response = await client.get("/api/plugin/phone_control/apk")
             assert apk_response.status_code == 404
             assert "单独下载" in apk_response.json()["detail"]
             assert (await client.post("/api/plugin/phone_control/setup", json={})).status_code == 403
             headers = {"X-Phone-Setup": "1"}
             assert (await client.post("/api/plugin/phone_control/setup", headers=headers, json={"public_ip": "bad"})).status_code == 400
-            settings = {"public_ip": "127.0.0.1", "port": unused_port(), "allowed_sessions": ["test:dm:owner"], "voice_enabled": True}
+            settings = {"public_ip": "127.0.0.1", "port": unused_port(), "shared_entry": False,
+                        "allowed_sessions": ["test:dm:owner"], "voice_enabled": True}
             invalid_voice = await client.post("/api/plugin/phone_control/setup", headers=headers, json=dict(settings, voice_enabled="true"))
             assert invalid_voice.status_code == 400
             saved = await client.post("/api/plugin/phone_control/setup", headers=headers, json=settings)

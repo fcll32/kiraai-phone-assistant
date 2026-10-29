@@ -200,3 +200,35 @@ async def test_inconsistent_screenshot_dimensions_rejected():
     bridge.request = AsyncMock(return_value={"width": 1080, "height": 2400, "image_base64": base64.b64encode(output.getvalue()).decode()})
     with pytest.raises(PhoneError, match="比例"):
         await bridge.screenshot("phone")
+
+
+@pytest.mark.asyncio
+async def test_wait_uses_no_phone_command_and_keeps_connection_on_cancel():
+    bridge = AppBridge({"device_token": TOKEN})
+    socket = AsyncMock()
+    bridge.socket, bridge.connection = socket, "phone"
+    bridge.request = AsyncMock()
+    await bridge.action("phone", "wait", {"seconds": 0}, None)
+    bridge.request.assert_not_awaited()
+    waiting = asyncio.create_task(bridge.action("phone", "wait", {"seconds": 5}, None))
+    await asyncio.sleep(0)
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    assert bridge.socket is socket and bridge.connection == "phone"
+    socket.close.assert_not_awaited()
+    bridge.request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement", [None, "new-phone-connection"])
+async def test_wait_detects_disconnect_or_replacement(replacement):
+    bridge = AppBridge({"device_token": TOKEN})
+    bridge.socket, bridge.connection = AsyncMock(), "old-phone-connection"
+    bridge.request = AsyncMock()
+    waiting = asyncio.create_task(bridge.action(bridge.connection, "wait", {"seconds": 0.01}, None))
+    await asyncio.sleep(0)
+    bridge.socket, bridge.connection = (AsyncMock() if replacement else None), replacement
+    with pytest.raises(PhoneError):
+        await waiting
+    bridge.request.assert_not_awaited()

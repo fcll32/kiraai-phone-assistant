@@ -1,0 +1,30 @@
+<template>
+  <view class="aurora-backdrop" aria-hidden="true">
+    <image class="aurora-wallpaper" :src="source" :style="artStyle" mode="aspectFill" />
+    <view v-if="isScene" class="aurora-art-fade" :style="artStyle" />
+    <view class="aurora-blue" /><view class="aurora-light" />
+  </view>
+</template>
+<script setup>
+import { computed } from 'vue'
+const props = defineProps({ scene: { type: String, default: 'original' }, width: { type: Number, default: 0 } })
+const scenes = ['device', 'connection', 'voice', 'guide', 'about', 'menu']
+const window = uni.getWindowInfo()
+const isScene = computed(() => scenes.includes(props.scene))
+const source = computed(() => isScene.value ? '/static/scenes/' + props.scene + '.png' : '/static/kira-wallpaper.jpg')
+// Fit the portrait to width instead of cropping a much larger face to viewport height.
+// Short displays lift the art further; the fixed title zone stays free of cards.
+const artStyle = computed(() => {
+  if (!isScene.value) return { height: '100%', top: '0px' }
+  const containerWidth = props.width > 0 ? props.width : window.windowWidth
+  const artWidth = Math.min(containerWidth, 480)
+  return { width: artWidth + 'px', left: (containerWidth - artWidth) + 'px', height: (artWidth * 1.5) + 'px', top: (window.windowHeight < 700 ? -80 : -40) + 'px' }
+})
+</script>
+<style>
+.aurora-backdrop { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; pointer-events: none; background-color: #d9e9ff; }
+.aurora-wallpaper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.aurora-art-fade { position: absolute; left: 0; width: 100%; background-image: linear-gradient(to bottom,rgba(217,233,255,0) 52%,rgba(217,233,255,0.18) 72%,#d9e9ff 100%); }
+.aurora-blue { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-image: linear-gradient(to bottom,rgba(224,240,255,0.12),rgba(218,237,255,0.18),rgba(224,239,255,0.46)); }
+.aurora-light { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-image: linear-gradient(to right,rgba(231,244,255,0.28),rgba(209,224,255,0.02)); }
+</style>

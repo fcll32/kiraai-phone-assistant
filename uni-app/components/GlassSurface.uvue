@@ -1,0 +1,31 @@
+<template>
+  <view class="glass-surface" :style="surfaceStyle" aria-hidden="true">
+    <view class="glass-wash" />
+    <view class="glass-rim" :style="{ borderRadius: Math.max(0, radius - 2) + 'px' }" />
+    <view class="glass-fold glass-fold-top" />
+    <view class="glass-fold glass-fold-bottom" />
+  </view>
+</template>
+<script setup>
+import { computed } from 'vue'
+const props = defineProps({ radius: { type: Number, default: 22 }, sdk: { type: Number, default: 30 }, active: { type: Boolean, default: true }, blurred: { type: Boolean, default: true } })
+const surfaceStyle = computed(() => {
+  // Keep older Android phones on a translucent matte surface. Native Vapor
+  // currently supports blur(), while saturation is a browser-only enhancement.
+  let supported = props.sdk >= 31, filter = 'blur(10px)'
+  // #ifdef H5
+  supported = true; filter = 'blur(12px) saturate(1.28)'
+  // #endif
+  const blur = supported && props.active && props.blurred
+  // Pausing the blur during gestures must not also change the surface opacity.
+  return { borderRadius: props.radius + 'px', backdropFilter: blur ? filter : 'none', backgroundColor: supported ? 'rgba(240,248,255,0.70)' : 'rgba(237,246,255,0.94)' }
+})
+</script>
+<style>
+.glass-surface { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; pointer-events: none; border: 1px solid rgba(255,255,255,0.48); border-color: rgba(255,255,255,0.80); }
+.glass-wash { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-color: rgba(255,255,255,0.10); pointer-events: none; }
+.glass-rim { position: absolute; top: 2px; right: 2px; bottom: 2px; left: 2px; border: 1px solid rgba(132,164,187,0.15); border-top-color: rgba(255,255,255,0.68); border-left-color: rgba(255,255,255,0.30); pointer-events: none; border-color: rgba(128,169,232,0.13); }
+.glass-fold { position: absolute; width: 92px; height: 20px; border: 1px solid rgba(255,255,255,0.46); border-radius: 14px; pointer-events: none; border-color: rgba(255,255,255,0.68); }
+.glass-fold-top { top: -17px; left: 17px; transform: rotate(-5deg); }
+.glass-fold-bottom { bottom: -18px; right: 16px; transform: rotate(-5deg); border-color: rgba(128,158,181,0.22); }
+</style>

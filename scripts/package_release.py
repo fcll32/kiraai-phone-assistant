@@ -12,7 +12,7 @@ from sync_release import synchronize
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_DIRS = ("phone_control", "android-app", "uni-app", "deploy", "scripts", "third-party", ".github")
-ROOT_FILES = ("README.md", "新手使用说明.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "manifest.json", "schema.json", "main.py", "requirements.txt")
+ROOT_FILES = ("README.md", "新手使用说明.md", "RELEASE_NOTES.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "manifest.json", "icon.png", "schema.json", "main.py", "requirements.txt")
 
 
 def source_files():
@@ -24,7 +24,7 @@ def source_files():
                 continue
             if path.name in {"local.properties", "app-config.txt", "device-secret.txt"} or relative.as_posix() == "phone_control/config.json":
                 continue
-            if path.suffix not in {".py", ".java", ".json", ".md", ".html", ".xml", ".gradle", ".txt", ".yml", ".uvue", ".uts", ".js", ".mjs", ".properties"}:
+            if path.suffix not in {".py", ".java", ".json", ".md", ".html", ".css", ".xml", ".gradle", ".txt", ".yml", ".uvue", ".uts", ".js", ".mjs", ".properties", ".jpg", ".png"}:
                 continue
             files[relative.as_posix()] = path
     return files
@@ -48,6 +48,10 @@ def package(apk=None, export=None):
     guide = output / "新手使用说明.md"
     shutil.copy2(ROOT / "新手使用说明.md", guide)
     artifacts = [plugin, source, guide]
+    notes = ROOT / "RELEASE_NOTES.md"
+    if notes.is_file():
+        shutil.copy2(notes, output / notes.name)
+        artifacts.append(output / notes.name)
     if apk:
         apk = Path(apk).resolve()
         with zipfile.ZipFile(apk) as archive:
@@ -70,7 +74,7 @@ def package(apk=None, export=None):
         "点击“保存并启动”后开始监听，以后重启自动恢复；密码和校验码在管理页复制；手机单独安装同目录的 APK，无需下载源码或运行服务器脚本。\n"
         "手机地址只填 公网IP:端口，其他内容自动补上。原来的完整地址也能继续用。\n"
         f"源码：kiraai-phone-assistant-{version}-source.zip，仅用于开发和修改，普通使用不需要。\n"
-        "服务器安全组仍需放行手机连接端口（默认 TCP 8443）；Docker 安装还要映射同一端口。\n"
+        "共用入口放行 TCP 5267，Docker 映射 5267:8443；备用管理映射 127.0.0.1:15267:5267。浏览器使用 https://公网IP:5267。\n"
         "若上传提示插件已存在，先卸载旧插件，保留插件配置和插件数据，再安装新版 ZIP。\n"
         "Android 8–10 不支持真实截图，Android 11 及以上可按需截图。\n"
         "当前为测试版本，还需要在你的手机和服务器上实际连接验证。\n", encoding="utf-8")

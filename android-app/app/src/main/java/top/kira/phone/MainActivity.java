@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
     }
     private void buildSettings() {
         LinearLayout body = page(1); body.addView(text("地址只填公网 IP 和端口，后面的内容会自动补上。", 14, MUTED)); gap(body, 26);
-        url = field(body, "服务器地址", ServerAddress.display(prefs().getString("url", "")), "例如 203.0.113.10:8443", false);
+        url = field(body, "服务器地址", ServerAddress.display(prefs().getString("url", "")), "例如 203.0.113.10:5267", false);
         token = field(body, "连接密码", prefs().getString("token", ""), "复制插件页面显示的密码", true);
         pin = field(body, "服务器校验码", prefs().getString("pin", ""), "复制插件页面显示的校验码", false);
         url.setId(101); token.setId(102); pin.setId(103);

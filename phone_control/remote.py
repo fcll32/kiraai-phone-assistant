@@ -207,6 +207,15 @@ class AppBridge:
 
     async def action(self, connection, action, params, size):
         validate_action(action, params)
+        if action == "wait":
+            # Waiting has no phone-side effect. Keep the device lock at the tool
+            # layer, but avoid a round trip and sleeping on Android's worker.
+            if connection != await self.select_device():
+                raise PhoneError("手机已重连，请重新观察")
+            await asyncio.sleep(params.get("seconds", 1))
+            if connection != await self.select_device():
+                raise PhoneError("等待期间手机已重连，请重新观察")
+            return
         if action == "key" and params["key"] == "wake":
             raise PhoneError("App 模式不支持唤醒按键，请在手机上解锁")
         await self.request(connection, "action", {"action": action, "args": params, "size": list(size) if size else None})

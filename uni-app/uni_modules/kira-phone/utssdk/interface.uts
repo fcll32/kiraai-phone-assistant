@@ -1,4 +1,12 @@
 export type ReadState = () => string
+export type ReadUpdateState = () => string
+export type CheckUpdate = () => void
+export type CheckUpdateQuietly = () => void
+export type ProjectUrl = () => string
+export type OpenProject = () => void
+export type DownloadUpdate = () => void
+export type CancelUpdate = () => void
+export type InstallUpdate = () => void
 export type ReadCallState = () => string
 export type RequestMicrophone = () => void
 export type StartCall = () => void

@@ -1,8 +1,6 @@
 <template>
   <view>
-    <text class="call-kicker">语音陪伴</text>
-    <text class="call-headline">和 AI 聊一会儿</text>
-    <text class="call-lede">用你的声音，接通自己的 Kira。</text>
+    <PageIntro v-if="showIntro" kicker="语音陪伴" title="和 AI 聊一会儿" description="用你的声音，接通自己的 Kira。" :width="width" :active="visible" :duration="introDuration" />
     <view class="call-card">
       <view class="call-top"><text class="call-tag">APP 内通话</text><text class="call-tag">{{ voice.active ? '通话中' : '随时开始' }}</text></view>
       <view class="call-orbit">
@@ -52,8 +50,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import FeedbackButton from '@/components/FeedbackButton.uvue'
+import PageIntro from '@/components/PageIntro.uvue'
 import { animationDuration } from '@/lib/interactions.js'
-const props = defineProps({ voice: { type: Object, default: () => ({}) }, mic: { type: Object, default: () => ({}) }, labOpen: { type: Boolean, default: false }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 }, visible: { type: Boolean, default: true } })
+const props = defineProps({ showIntro: { type: Boolean, default: true }, voice: { type: Object, default: () => ({}) }, mic: { type: Object, default: () => ({}) }, labOpen: { type: Boolean, default: false }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 }, visible: { type: Boolean, default: true }, width: { type: Number, default: 346 }, introDuration: { type: Number, default: 400 } })
 const emit = defineEmits(['start', 'stop', 'mute', 'speaker', 'interrupt', 'authorize', 'test', 'stop-test', 'expand-lab'])
 const targetPackage = ref('top.kira.phone')
 const targets = [{ id: 'top.kira.phone', label: '本机检测' }, { id: 'com.tencent.mobileqq', label: 'QQ' }, { id: 'com.tencent.mm', label: '微信' }]
@@ -69,41 +68,41 @@ function selectTarget(value) { if (!props.mic.active) targetPackage.value = valu
 .call-kicker {color: #698095; font-size: 11px; letter-spacing: 1px; margin-top: 0; }
 .call-headline {font-weight: 600;   color: #233f58; font-size: 25px; line-height: 34px; margin-top: 5px; }
 .call-lede {color: #607588; font-size: 13px; line-height: 21px; margin-top: 6px; margin-bottom: 20px; }
-.call-card {border-radius: 24px;  margin-bottom: 16px;  background-color: #f8fafb; padding: 20px; border: 1px solid #d4e0ea; }
+.call-card { border-radius: 30px; margin-bottom: 16px; background-color: rgba(247,251,255,0.90); padding: 20px; box-shadow: 0 8px 28px rgba(50,75,156,0.12); border: 1px solid rgba(255,255,255,0.80); }
 .call-top { flex-direction: row; justify-content: space-between; }
-.call-tag { color: #6c8099; font-size: 11px; letter-spacing: 1px; }
-.call-orbit {align-items: center; justify-content: center;  height: 136px; }
-.call-orbit-ring { position: absolute; width: 122px; height: 122px; border-radius: 61px; border-width: 1px; border-color: #bcd5ef; border-style: solid; background-color: #f1f6fc; transition-property: transform, opacity; }
-.call-orb { width: 88px; height: 88px; border-radius: 44px; background-color: #e0ecfa; align-items: center; justify-content: center; }
-.call-orb-on {background-color: #c0d6e8; }
-.call-monogram {font-size: 36px; font-weight: 600;   color: #456b90; }
-.call-status { font-size: 18px; font-weight: 600; text-align: center; color: #15283f; }
-.call-note { font-size: 14px; line-height: 21px; color: #627287; text-align: center; margin-top: 10px; }
+.call-tag { color: #5071a5; font-size: 11px; letter-spacing: 1px; }
+.call-orbit {align-items: center; justify-content: center;  height: 100px; }
+.call-orbit-ring { position: absolute; width: 90px; height: 90px; border-radius: 45px; border-width: 1px; border-color: #b0cdf5; border-style: solid; background-color: rgba(187,217,255,0.35); transition-property: transform, opacity; }
+.call-orb { width: 68px; height: 68px; border-radius: 34px; background-color: #bfdbff; align-items: center; justify-content: center; background-image: linear-gradient(to bottom right,#a0ddff,#9faff4); border: 1px solid rgba(255,255,255,0.9); box-shadow: 0 8px 25px rgba(89,118,206,0.18); }
+.call-orb-on { background-color: #89c7f2; }
+.call-monogram { font-size: 36px; font-weight: 700; color: #ffffff; }
+.call-status { font-size: 20px; font-weight: 600; text-align: center; color: #203e74; }
+.call-note { font-size: 14px; line-height: 21px; color: #526b93; text-align: center; margin-top: 10px; }
 .call-primary { margin-top: 24px; }
 .call-controls { flex-direction: row; justify-content: space-between; margin-top: 20px; }
-.call-control { width: 76px; height: 76px; border-radius: 24px; background-color: #f0f4f9; align-items: center; justify-content: center; }
-.call-control-selected { background-color: #dceafb; }
+.call-control { width: 76px; height: 76px; border-radius: 27px; background-color: #e3edff; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.75); }
+.call-control-selected { background-color: #c5dcff; }
 .call-control-symbol { font-size: 26px; color: #1e63b4; }
 .call-control-text { font-size: 11px; margin-top: 4px; color: #264c7d; }
-.call-end { background-color: #b64855; }
+.call-end { background-color: #c75b76; border-color: #e8a3b5; }
 .call-end-text { color: #ffffff; }
 .call-meter { height: 24px; flex-direction: row; align-items: center; justify-content: center; margin-top: 16px; }
 .call-meter-bar { width: 4px; height: 24px; margin: 0 3px; border-radius: 3px; background-color: #5d96cf; transition-property: transform; }
-.call-caption {margin: 0 4px 24px;  color: #62798d; font-size: 12px; line-height: 20px; }
+.call-caption { margin: 0 4px 24px; color: #3c5982; font-size: 12px; line-height: 20px; }
 .call-interrupt { min-height: 44px; justify-content: center; align-items: center; margin-top: 12px; }
 .call-link { font-size: 14px; color: #1e63b4; }
-.call-section { font-size: 18px; color: #15283f; font-weight: 600; margin-top: 4px; }
+.call-section { font-size: 18px; color: #264779; font-weight: 600; margin-top: 4px; }
 .call-message { margin-top: 16px; padding-top: 16px; border-top-style: solid; border-top-width: 1px; border-top-color: #edf0f5; }
 .call-speaker { font-size: 11px; color: #597fa9; margin-bottom: 8px; }
-.call-message-text { font-size: 14px; line-height: 22px; color: #34465c; }
+.call-message-text { font-size: 14px; line-height: 22px; color: #405c86; }
 .call-lab-heading { min-height: 48px; flex-direction: row; align-items: center; justify-content: space-between; }
 .call-left { text-align: left; }
-.call-lab-result { background-color: #eef4fb; border-radius: 14px; padding: 16px; margin-top: 16px; }
+.call-lab-result { background-color: #e7f0ff; border-radius: 14px; padding: 16px; margin-top: 16px; }
 .call-result-label { font-size: 11px; color: #597fa9; margin-bottom: 8px; }
 .call-lab-action { min-height: 48px; justify-content: center; margin-top: 8px; }
 .call-targets { flex-direction: row; margin-top: 12px; }
-.call-target { min-height: 44px; padding: 0 16px; justify-content: center; border-radius: 14px; background-color: #f0f4f9; margin-right: 8px; }
-.call-target-on { background-color: #dceafb; }
+.call-target { min-height: 44px; padding: 0 16px; justify-content: center; border-radius: 16px; background-color: #e2ecff; margin-right: 8px; }
+.call-target-on { background-color: #c6dcff; }
 .call-target-label { font-size: 14px; color: #264c7d; }
 .call-fine { font-size: 11px; line-height: 18px; color: #7d8794; margin-top: 8px; }
 </style>

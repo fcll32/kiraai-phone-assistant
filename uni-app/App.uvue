@@ -2,5 +2,5 @@
 export default { onLaunch() {} }
 </script>
 <style>
-page { background-color: #e9eef2; }
+page { background-color: #d9e9ff; }
 </style>

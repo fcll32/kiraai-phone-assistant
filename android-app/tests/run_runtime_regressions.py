@@ -28,6 +28,7 @@ public class AndroidBoundaryRepro {
  static class SharedPreferences {
   Map<String,String> data = new HashMap<>();
   String getString(String k,String d){return data.getOrDefault(k,d);}
+  boolean getBoolean(String k,boolean d){return data.containsKey(k)?Boolean.parseBoolean(data.get(k)):d;}
   SharedPreferences edit(){return this;}
   SharedPreferences putString(String k,String v){data.put(k,v);return this;}
   boolean commit(){return true;}
@@ -49,6 +50,12 @@ public class AndroidBoundaryRepro {
 code += method('PhoneRuntime.java', 'public static void save(')
 code += method('PhoneRuntime.java', 'private static String[] validateConfig(')
 code += method('PhoneRuntime.java', 'public static void start(')
+code += method('PhoneRuntime.java', 'private static boolean screenProtected(')
+code += method('PhoneRuntime.java', 'public static void secure(Activity activity)')
+code += '''
+ static boolean appliedSecure;
+ static boolean applySecure(Activity a,boolean enabled,boolean persist){appliedSecure=enabled;return enabled;}
+'''
 code += '''
  static class JSONObject {
   Map<String,String> data = new HashMap<>();
@@ -72,6 +79,13 @@ code += '''
  }
  public static void main(String[] args) {
   Activity a=new Activity();
+  if(screenProtected(a.settings))throw new AssertionError("Fresh privacy protection must default off");
+  secure(a);if(appliedSecure)throw new AssertionError("Fresh activity must allow screenshots");
+  a.settings.putString("screen_protected","true");secure(a);
+  if(!screenProtected(a.settings)||!appliedSecure)throw new AssertionError("Saved enabled preference must survive");
+  a.settings.putString("screen_protected","false");secure(a);
+  if(screenProtected(a.settings)||appliedSecure)throw new AssertionError("Saved disabled preference must survive");
+  System.out.println("PASS: default privacy off and both saved choices restored");
   a.settings.putString("url","wss://127.0.0.1:8443/ws/plugin/phone_control/device")
    .putString("token","MyKira88").putString("pin","");
   VoiceRuntime.active=true;

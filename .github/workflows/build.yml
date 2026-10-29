@@ -27,6 +27,8 @@ jobs:
       - run: python scripts/sync_release.py
       - run: python scripts/test_android_gate.py
       - run: python android-app/tests/run_runtime_regressions.py
+      - run: python android-app/tests/run_control_regressions.py
+      - run: python android-app/tests/run_update_regressions.py
       - run: node --test scripts/test_ui_interactions.mjs scripts/test_ui_regressions.mjs
       - run: python scripts/prepare_uni_tools.py
       - run: python scripts/compile_uni.py --hbuilderx .runtime/uni-tools/HBuilderX

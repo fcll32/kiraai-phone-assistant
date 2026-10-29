@@ -42,7 +42,11 @@ public class PhoneAccessibility extends AccessibilityService {
         main.post(() -> { if (result.isDone()) return;
             try { gate.check(); result.complete(work.call()); } catch (Exception e) { result.completeExceptionally(e); } });
         try { return result.get(6, TimeUnit.SECONDS); }
-        catch (Exception e) { result.cancel(false); throw e; }
+        catch (Exception e) {
+            result.cancel(false);
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw e;
+        }
     }
     private DisplayMetrics metrics() {
         DisplayMetrics value = new DisplayMetrics();
@@ -55,29 +59,37 @@ public class PhoneAccessibility extends AccessibilityService {
         long delay = 400 - (SystemClock.elapsedRealtime() - lastScreenshot);
         if (delay > 0) Thread.sleep(delay);
         lastScreenshot = SystemClock.elapsedRealtime();
-        CompletableFuture<Bitmap> future = new CompletableFuture<>();
+        CompletableFuture<ScreenshotResult> future = new CompletableFuture<>();
         main.post(() -> { if (future.isDone()) return;
             try { gate.check();
             takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
             @Override public void onSuccess(ScreenshotResult result) {
-                try (HardwareBuffer buffer = result.getHardwareBuffer()) {
-                    gate.check();
-                    Bitmap hardware = Bitmap.wrapHardwareBuffer(buffer, result.getColorSpace());
-                    if (hardware == null) throw new IllegalStateException("无法读取截图缓冲区");
-                    try {
-                        Bitmap copy = hardware.copy(Bitmap.Config.ARGB_8888, false);
-                        if (copy == null) throw new IllegalStateException("截图缓冲分配失败");
-                        if (!future.complete(copy)) copy.recycle();
-                    } finally { hardware.recycle(); }
-                } catch (Exception e) { future.completeExceptionally(e); }
+                // Transfer ownership only. Full-resolution pixel copies must not
+                // block the UI thread; a cancelled/late callback still owns cleanup.
+                if (!future.complete(result)) result.getHardwareBuffer().close();
             }
             @Override public void onFailure(int errorCode) {
                 future.completeExceptionally(new IllegalStateException("系统截图失败，错误码 " + errorCode + "；受保护窗口可能禁止截图"));
             }
         }); } catch (Exception error) { future.completeExceptionally(error); } });
+        ScreenshotResult captured;
+        try { captured = future.get(6, TimeUnit.SECONDS); }
+        catch (Exception e) {
+            future.cancel(false);
+            future.thenAccept(result -> result.getHardwareBuffer().close());
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw e;
+        }
         Bitmap bitmap;
-        try { bitmap = future.get(6, TimeUnit.SECONDS); }
-        catch (Exception e) { future.cancel(false); future.thenAccept(Bitmap::recycle); throw e; }
+        try (HardwareBuffer buffer = captured.getHardwareBuffer()) {
+            gate.check();
+            Bitmap hardware = Bitmap.wrapHardwareBuffer(buffer, captured.getColorSpace());
+            if (hardware == null) throw new IllegalStateException("无法读取截图缓冲区");
+            try {
+                bitmap = hardware.copy(Bitmap.Config.ARGB_8888, false);
+                if (bitmap == null) throw new IllegalStateException("截图缓冲分配失败");
+            } finally { hardware.recycle(); }
+        }
         Bitmap preview = bitmap;
         try {
             gate.check();
@@ -89,8 +101,15 @@ public class PhoneAccessibility extends AccessibilityService {
             if (!preview.compress(jpeg ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.PNG, jpeg ? 85 : 100, output))
                 throw new IllegalStateException("截图编码失败");
             if (output.size() > 8_000_000) throw new IllegalStateException("截图过大，请调低截图长边");
-            JSONObject ui = onMain(this::uiState, gate);
-            JSONArray nodes = ui.getInt("width") == width && ui.getInt("height") == height ? ui.getJSONArray("nodes") : new JSONArray();
+            JSONArray nodes = new JSONArray();
+            try {
+                JSONObject ui = onMain(this::uiState, gate);
+                if (ui.getInt("width") == width && ui.getInt("height") == height) nodes = ui.getJSONArray("nodes");
+            } catch (Exception error) {
+                // Controls are optional metadata. Preserve a valid image when a
+                // window disappears, but never suppress cancellation/expiry.
+                gate.check();
+            }
             return new JSONObject().put("width", width).put("height", height).put("nodes", nodes)
                 .put("image_format", jpeg ? "jpeg" : "png")
                 .put("image_base64", Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP));
@@ -145,11 +164,13 @@ public class PhoneAccessibility extends AccessibilityService {
         CharSequence desc = node.isPassword() ? null : node.getContentDescription();
         if (node.isVisibleToUser() && (node.isClickable() || node.isEditable() || text != null || desc != null)) {
             Rect rect = new Rect(); node.getBoundsInScreen(rect);
-            String label = String.valueOf(text != null ? text : desc != null ? desc : "");
-            nodes.put(new JSONObject().put("text", label.substring(0, Math.min(label.length(), 160)))
-                .put("editable", node.isEditable()).put("clickable", node.isClickable())
-                .put("x", Math.max(0, Math.min(1000, rect.centerX() * 1000 / Math.max(1, size.widthPixels))))
-                .put("y", Math.max(0, Math.min(1000, rect.centerY() * 1000 / Math.max(1, size.heightPixels)))));
+            if (!rect.isEmpty() && rect.intersect(0, 0, size.widthPixels, size.heightPixels)) {
+                String label = String.valueOf(text != null ? text : desc != null ? desc : "");
+                nodes.put(new JSONObject().put("text", label.substring(0, Math.min(label.length(), 160)))
+                    .put("editable", node.isEditable()).put("clickable", node.isClickable())
+                    .put("x", rect.centerX() * 1000 / Math.max(1, size.widthPixels))
+                    .put("y", rect.centerY() * 1000 / Math.max(1, size.heightPixels)));
+            }
         }
         for (int i=0; i<node.getChildCount() && visited[0] < 600 && nodes.length()<120; i++) {
             AccessibilityNodeInfo child = node.getChild(i);
@@ -225,11 +246,20 @@ public class PhoneAccessibility extends AccessibilityService {
                     if (node == null) throw new IllegalStateException("输入框未聚焦");
                     try {
                         CharSequence old = node.getText(); if (old == null || node.isPassword()) throw new IllegalStateException("无法读取当前文本");
-                        String value = old.toString(); int end = node.getTextSelectionEnd(), start = node.getTextSelectionStart();
-                        if (start < 0 || end < start) throw new IllegalStateException("光标位置不可用");
+                        String value = old.toString(); int anchor = node.getTextSelectionStart(), edge = node.getTextSelectionEnd();
+                        // Android preserves the selection direction; either endpoint may come first.
+                        int start = Math.min(anchor, edge), end = Math.max(anchor, edge);
+                        if (start < 0 || end > value.length()) throw new IllegalStateException("光标位置不可用");
                         int from = start == end && start > 0 ? value.offsetByCodePoints(start,-1) : start;
-                        Bundle bundle = new Bundle(); bundle.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value.substring(0,from)+value.substring(end));
-                        if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,bundle)) throw new IllegalStateException("删除字符失败");
+                        if (from != end) {
+                            Bundle bundle = new Bundle(); bundle.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value.substring(0,from)+value.substring(end));
+                            if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,bundle)) throw new IllegalStateException("删除字符失败");
+                            Bundle caret = new Bundle();
+                            caret.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, from);
+                            caret.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, from);
+                            if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, caret))
+                                throw new IllegalStateException("文字已删除，但光标未能恢复；请重新观察后继续");
+                        }
                     } finally { node.recycle(); }
                 } else throw new IllegalArgumentException("当前 Android 不支持该按键；请使用屏幕按钮");
                 return true;

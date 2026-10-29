@@ -1,0 +1,62 @@
+<template>
+  <view class="update-card">
+    <view class="update-heading"><text class="update-title">应用更新</text><text class="update-current">当前 {{ version }}</text></view>
+    <text v-if="update.version && update.status !== 'latest'" class="update-version">新版 {{ update.version }}</text>
+    <text class="update-detail">{{ update.detail }}</text>
+    <view v-if="update.status === 'downloading' || update.status === 'verifying'" class="update-progress">
+      <view class="update-track"><view class="update-fill" :style="{ transform: 'scaleX(' + progress + ')', transitionDuration: animated ? '220ms' : '0ms' }" /></view>
+      <view class="update-count" aria-live="polite"><StableNumber :value="String(Math.round(progress * 100))" :reserve="3" /><text class="update-unit">% · </text><StableNumber :value="megabytes(update.bytes)" :reserve="5" /><text class="update-unit"> / </text><StableNumber :value="megabytes(update.total)" :reserve="5" /><text class="update-unit"> MB</text></view>
+    </view>
+    <text v-if="update.notes" class="update-link" role="button" @click="showNotes = !showNotes">{{ showNotes ? '收起更新说明' : '查看更新说明' }}</text>
+    <text v-if="showNotes && update.notes" class="update-notes">{{ update.notes }}</text>
+    <view class="update-action"><FeedbackButton :label="primaryLabel" busy-text="正在检查" :state="update.status === 'checking' ? 'busy' : 'idle'" :disabled="busy" :animated="animated" :speed="speed" :active="active" @press="primary" /></view>
+    <view class="update-links">
+      <text v-if="busy" class="update-link" role="button" @click="invoke('cancelUpdate')">取消操作</text>
+      <text v-else-if="canDownload || canInstall" class="update-link" role="button" @click="invoke('checkUpdate')">重新检查</text>
+      <text class="update-source">来自项目 GitHub 正式发布</text>
+    </view>
+    <text class="update-note">下载后先校验，安装由你确认。首次安装更新时，Android 可能要求允许此 App 安装应用。</text>
+  </view>
+</template>
+<script setup>
+import { ref, reactive, computed, watch, onUnmounted } from 'vue'
+import FeedbackButton from '@/components/FeedbackButton.uvue'
+import StableNumber from '@/components/StableNumber.uvue'
+import { phone, errorText } from '@/lib/phone.js'
+const props = defineProps({ version: { type: String, default: '1.0.0' }, active: { type: Boolean, default: true }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 } })
+const emit = defineEmits(['state'])
+const update = reactive({ status: 'idle', detail: '检查新版，下载后在这里安装。', progress: 0, version: '', notes: '', bytes: 0, total: 0 })
+const showNotes = ref(false)
+const busy = computed(() => ['checking', 'downloading', 'verifying'].includes(update.status))
+const canInstall = computed(() => ['ready', 'permission'].includes(update.status))
+const canDownload = computed(() => !!update.version && !canInstall.value && !busy.value && update.status !== 'latest')
+const progress = computed(() => Math.max(0, Math.min(1, Number(update.progress) || 0)))
+const primaryLabel = computed(() => canInstall.value ? '安装更新' : canDownload.value ? '下载新版' : update.status === 'downloading' ? '正在下载' : update.status === 'verifying' ? '正在校验' : '检查更新')
+let timer = null, disposed = false
+function megabytes(value) { return (Math.max(0, Number(value) || 0) / 1048576).toFixed(1) }
+function refresh() { if (disposed || !props.active) return; try { const value = JSON.parse(phone.readUpdateState()); Object.assign(update, value); emit('state', value) } catch (error) { update.status = 'error'; update.detail = errorText(error) } }
+function invoke(method) { if (disposed || !props.active) return; try { phone[method](); refresh() } catch (error) { update.status = 'error'; update.detail = errorText(error) } }
+function primary() { if (busy.value) return; invoke(canInstall.value ? 'installUpdate' : canDownload.value ? 'downloadUpdate' : 'checkUpdate') }
+function stop() { if (timer != null) clearInterval(timer); timer = null }
+watch(() => props.active, () => { stop(); if (props.active && !disposed) { refresh(); timer = setInterval(refresh, 950) } }, { immediate: true })
+onUnmounted(() => { disposed = true; stop() })
+</script>
+<style>
+.update-card { padding: 20px; margin-bottom: 18px; border-radius: 30px; background-color: rgba(241,248,255,0.93); box-shadow: 0 7px 24px rgba(50,75,156,0.11); border: 1px solid rgba(255,255,255,0.8); }
+.update-heading { flex-direction: row; align-items: center; justify-content: space-between; }
+.update-title { font-size: 17px; font-weight: 700; color: #254779; }
+.update-current { font-size: 12px; color: #5070a1; }
+.update-version { margin-top: 14px; font-size: 15px; color: #345e7c; font-weight: 600; }
+.update-detail { margin-top: 12px; color: #526b93; font-size: 13px; line-height: 21px; }
+.update-progress { margin-top: 16px; }
+.update-track { height: 5px; border-radius: 3px; background-color: #d8e7ff; overflow: hidden; }
+.update-fill { height: 5px; background-color: #5a8de2; transform-origin: left center; transition-property: transform; }
+.update-count { margin-top: 8px; flex-direction: row; align-items: center; }
+.update-unit { font-size: 12px; line-height: 20px; color: #526c81; }
+.update-action { margin-top: 18px; }
+.update-links { flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.update-link { color: #365d7a; font-size: 12px; padding: 12px 0; }
+.update-source { color: #586f81; font-size: 11px; padding: 12px 0; }
+.update-notes { color: #3e5e8e; font-size: 13px; line-height: 21px; padding: 12px; background-color: #e5efff; border-radius: 18px; }
+.update-note { color: #586f81; font-size: 11px; line-height: 18px; }
+</style>

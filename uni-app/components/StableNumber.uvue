@@ -1,0 +1,15 @@
+<template>
+  <view class="stable-number" :aria-label="String(value)" :style="{ height: lineHeight + 'px' }">
+    <text v-for="(cell, i) in cells" :key="i" aria-hidden="true" class="number-cell" :style="{ width: cell.width * fontSize + 'px', fontSize: fontSize + 'px', lineHeight: lineHeight + 'px', color: color }">{{ cell.char }}</text>
+  </view>
+</template>
+<script setup>
+import { computed } from 'vue'
+import { numberCells } from '@/lib/typography.js'
+const props = defineProps({ value: { type: String, default: '' }, reserve: { type: Number, default: 0 }, fontSize: { type: Number, default: 12 }, lineHeight: { type: Number, default: 20 }, color: { type: String, default: '#526c81' } })
+const cells = computed(() => numberCells(props.value, props.reserve))
+</script>
+<style>
+.stable-number { flex-direction: row; align-items: center; flex-shrink: 0; }
+.number-cell { text-align: center; flex-shrink: 0; }
+</style>

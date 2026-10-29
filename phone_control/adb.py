@@ -51,6 +51,10 @@ class AdbClient:
             raise PhoneError("找不到 adb；请安装 Android Platform Tools 并配置 adb_path") from exc
         self.processes.add(process)
         try:
+            # Stop may run while process creation yields, before this process is
+            # visible to close(). Reap it through the same finally block.
+            if self.closed:
+                raise PhoneError("插件已停止，请重新启用")
             try:
                 stdout, stderr = await asyncio.wait_for(process.communicate(), self.timeout)
             except asyncio.TimeoutError as exc:

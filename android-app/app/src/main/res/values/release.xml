@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">KiraAI 手机助手</string>
+    <string name="update_repository" translatable="false">fcll32/kiraai-phone-assistant</string>
     <integer name="protocol_version">1</integer>
 </resources>

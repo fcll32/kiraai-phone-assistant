@@ -1,0 +1,18 @@
+[
+  {
+    "asset": "plugin-avatar.png",
+    "prompt": "Use case: stylized-concept. Create ONE square production app/avatar icon, not a mockup, no icon grid. Reference image is the exact character identity and anime style reference: long periwinkle blue hair, pale lavender highlights, vivid cyan-blue eyes, white/pale-blue scarf and hoodie, soft blush. Maintain that character. Use polished clean Q-version anime rendering with crisp linework and clear simple silhouette, readable at 40px. No letters, logo, text, watermark, extra people or scenery. Opaque full-bleed pale ice-blue to soft lavender background; no pre-rounded corners, no outer frame. Purpose: KiraAI phone-control PLUGIN avatar. Head-and-shoulders chibi portrait, cheerful attentive smile with both cyan eyes open, gentle slight head tilt. Both small hands hold a single connected blue cable connector below the scarf, clearly suggesting successful connection. Keep face unobstructed. Fill about 75% of square with central character, modest clear margin, uncluttered broad color shapes. Distinct pose from a phone launcher icon. Soft blue glass-like glow behind her, minimal details.",
+    "engine": "built-in image_gen",
+    "reference": "uni-app/static/kira-wallpaper.jpg",
+    "generated_file": "exec-2602cf2d-ace9-4301-ae98-042f25e41b2b.png",
+    "destination": "phone_control/web/assets/plugin-avatar.png"
+  },
+  {
+    "asset": "app-avatar.png",
+    "prompt": "Use case: stylized-concept. Create ONE square production app/avatar icon, not a mockup, no icon grid. Reference image is the exact character identity and anime style reference: long periwinkle blue hair, pale lavender highlights, vivid cyan-blue eyes, white/pale-blue scarf and hoodie, soft blush. Maintain that character. Use polished clean Q-version anime rendering with crisp linework and clear simple silhouette, readable at 40px. No letters, logo, text, watermark, extra people or scenery. Opaque full-bleed pale ice-blue to soft lavender background; no pre-rounded corners, no outer frame. Purpose: Android launcher icon for KiraAI phone assistant APK. Very simple front-facing head-and-shoulders chibi character, warm confident smile and big open cyan eyes, one hand holds a compact blue smartphone just below the chin to the side without covering face. Face and phone are the only focal points. Center the complete important silhouette, face and phone inside the central 64% square so circle and rounded-square launcher masks cannot cut them. Leave generous plain pale ice-blue background all around, especially corners. Hair may reach a little outside that safe zone but face/phone/hands must stay inside it. Large clean facial features, restrained highlights, no tiny symbols or busy sparkle effects. Suitable for Android adaptive icon inset artwork.",
+    "engine": "built-in image_gen",
+    "reference": "uni-app/static/kira-wallpaper.jpg",
+    "generated_file": "exec-fb4ed0a4-dae4-4d07-afc9-6377803599d8.png",
+    "destination": "android-app/app/src/main/res/drawable-nodpi/kira_launcher_art.png"
+  }
+]

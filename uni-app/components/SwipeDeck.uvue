@@ -22,14 +22,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 const props = defineProps({
   cards: { type: Array, default: () => [] },
   checks: { type: Array, default: () => [] },
   current: { type: Number, default: 0 },
   width: { type: Number, default: 346 },
   height: { type: Number, default: 188 },
-  duration: { type: Number, default: 320 }
+  duration: { type: Number, default: 320 },
+  active: { type: Boolean, default: true }
 })
 const emit = defineEmits(['change', 'select', 'grab'])
 const ratio = ref(0)
@@ -41,7 +42,7 @@ const liquidY = ref(1)
 const pressed = ref(false), tiltX = ref(0), tiltY = ref(0), glintX = ref(0), glintY = ref(0)
 let selectTimer = null, pressLeft = 20, pressTop = 0, originRatio = 0
 let startX = 0, startY = 0, axis = 0, touched = false, lastX = 0, lastTime = 0
-let spring = null, velocity = 0
+let spring = null, velocity = 0, pendingIndex = null
 const gap = computed(() => props.width - 40)
 const live = computed(() => dragging.value || settling.value)
 const position = computed(() => props.current - ratio.value)
@@ -50,9 +51,9 @@ const underlineStyle = computed(() => {
   const cell = props.width / Math.max(1, props.cards.length), worm = Math.sin(fraction * Math.PI) * cell * 0.45
   return { width: '28px', transform: 'translateX(' + (p * cell + (cell - 28) / 2 - worm / 2) + 'px) scaleX(' + (1 + worm / 28) + ')' }
 })
-function segmentStyle(i) { const amount = 1 - Math.min(1, Math.abs(position.value - i)); return { color: 'rgb(' + Math.round(103 - amount * 54) + ',' + Math.round(125 - amount * 42) + ',' + Math.round(145 - amount * 34) + ')', fontWeight: '600', fontSize: '13px' } }
+function segmentStyle(i) { const amount = 1 - Math.min(1, Math.abs(position.value - i)); return { color: 'rgb(' + Math.round(103 - amount * 54) + ',' + Math.round(125 - amount * 42) + ',' + Math.round(145 - amount * 34) + ')', fontWeight: String(Math.round(400 + amount * 200)), fontSize: '13px' } }
 function dotStyle(i) { const amount = 1 - Math.min(1, Math.abs(position.value - i)); return { transform: 'scaleX(' + (1 + amount * 1.5) + ')', opacity: 0.3 + amount * 0.7 } }
-function pick(i) { touched = true; pressed.value = false; if (selectTimer != null) clearTimeout(selectTimer); settle(i - props.current); emit('grab') }
+function pick(i) { if (!props.active) return; touched = true; pressed.value = false; if (selectTimer != null) clearTimeout(selectTimer); settle(i - props.current); emit('grab') }
 function tilt(touch) {
   if (props.duration === 0) return
   const x = Math.max(-1, Math.min(1, (touch.clientX - pressLeft) / (props.width - 52) * 2 - 1))
@@ -84,6 +85,8 @@ function cardStyle(index) {
   }
 }
 function onStart(event) {
+  if (!props.active) return
+  pendingIndex = null
   const touch = event.touches[0]
   if (selectTimer != null) { clearTimeout(selectTimer); selectTimer = null }
   if (spring != null) { clearInterval(spring); spring = null }
@@ -136,6 +139,7 @@ function onEnd() {
   settle(target)
 }
 function settle(target) {
+  pendingIndex = props.current + target
   if (spring != null) { clearInterval(spring); spring = null }
   const from = ratio.value
   const destination = -target
@@ -147,6 +151,7 @@ function settle(target) {
     ratio.value = 0; settling.value = false
     lean.value = 0; liquidX.value = 1; liquidY.value = 1
     if (target !== 0) emit('change', props.current + target)
+    pendingIndex = null
     return
   }
   spring = setInterval(() => {
@@ -162,41 +167,51 @@ function settle(target) {
       lean.value = 0; liquidX.value = 1; liquidY.value = 1
       settling.value = false
       if (target !== 0) emit('change', props.current + target)
+      pendingIndex = null
     }
   }, 16)
 }
 function onCancel() { touched = true; pressed.value = false; dragging.value = false; velocity = 0; settle(0) }
 function onSelect(index, event) {
-  if (touched || settling.value || index !== props.current) return
+  if (!props.active || touched || settling.value || index !== props.current) return
   // Measure in this component before mounting the overlay. A parent selector
   // may not cross native component boundaries and used to flash a full panel.
   const element = event ? event.currentTarget : null
   const rect = element ? element.getBoundingClientRect() : null
   if (selectTimer != null) clearTimeout(selectTimer)
-  const publish = () => { selectTimer = null; if (!touched && index === props.current) emit('select', { index, rect }) }
+  const publish = () => { selectTimer = null; if (props.active && !touched && index === props.current) emit('select', { index, rect }) }
   if (props.duration === 0) publish()
   else selectTimer = setTimeout(publish, props.duration * 100 / 320)
 }
-onUnmounted(() => { if (spring != null) clearInterval(spring); if (selectTimer != null) clearTimeout(selectTimer) })
+function stopMotion() {
+  if (spring != null) clearInterval(spring)
+  if (selectTimer != null) clearTimeout(selectTimer)
+  spring = null; selectTimer = null; pressed.value = false; dragging.value = false; settling.value = false
+  ratio.value = 0; lean.value = 0; liquidX.value = 1; liquidY.value = 1
+  if (pendingIndex != null && pendingIndex !== props.current) emit('change', pendingIndex)
+  pendingIndex = null
+}
+watch(() => [props.active, props.duration], () => { if (!props.active || !props.duration) stopMotion() })
+onUnmounted(() => { pendingIndex = null; stopMotion() })
 </script>
 
 <style>
 .deck { position: relative; overflow: hidden; }
-.deck-segments { position: relative; height: 42px; flex-direction: row; margin-bottom: 12px; }
+.deck-segments { position: relative; height: 42px; flex-direction: row; margin-bottom: 12px; border-radius: 18px; background-color: rgba(232,243,255,0.72); border: 1px solid rgba(255,255,255,0.6); }
 .deck-segment { flex: 1; align-items: center; justify-content: center; padding-bottom: 8px; }
-.deck-underline {position: absolute; left: 0; bottom: 0; height: 3px; border-radius: 4px;  transform-origin: left center;  background-color: #6687a8; }
+.deck-underline { position: absolute; left: 0; bottom: 0; height: 3px; border-radius: 4px; transform-origin: left center; background-color: #5287e4; }
 .deck-dots { height: 16px; flex-direction: row; justify-content: center; align-items: center; }
-.deck-dot {width: 5px; height: 5px; border-radius: 4px;  margin: 0 7px;  background-color: #6687a8; }
+.deck-dot { width: 5px; height: 5px; border-radius: 4px; margin: 0 7px; background-color: #547cc4; }
 .deck-glint { position: absolute; left: 0; top: 0; width: 140px; height: 140px; border-radius: 70px; background-color: rgba(163,202,255,0.14); pointer-events: none; }
-.deck-card {position: absolute; top: 0; left: 0; right: 0; height: 180px; padding: 20px; border-radius: 20px; border-style: solid; border-width: 1px;   transition-property: transform,opacity; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1);  background-color: #f8fafb; border-color: #d4e0ea; }
-.deck-card-active {border-color: #c7dcf2;   background-color: #f8fafb; }
+.deck-card { position: absolute; top: 0; left: 0; right: 0; height: 180px; padding: 20px; border-radius: 26px; box-shadow: 0 5px 16px rgba(43,72,151,0.12); transition-property: transform,opacity; transition-timing-function: cubic-bezier(0.22,0.8,0.3,1); background-color: rgba(246,251,255,0.90); border: 1px solid rgba(255,255,255,0.8); }
+.deck-card-active { border-color: #ffffff; background-color: rgba(246,251,255,0.94); }
 .deck-top { flex-direction: row; align-items: center; justify-content: space-between; }
-.deck-no {width: 30px; height: 30px; border-radius: 9px;  align-items: center; justify-content: center;  background-color: #e3edf5; }
-.deck-no-text { font-size: 11px; font-weight: 600; color: #1e63b4; }
-.deck-state { font-size: 11px; color: #555c62; }
+.deck-no { width: 30px; height: 30px; border-radius: 11px; align-items: center; justify-content: center; background-color: #deecff; border: 1px solid rgba(255,255,255,0.8); }
+.deck-no-text { font-size: 11px; font-weight: 600; color: #4277d3; }
+.deck-state { font-size: 11px; color: #5c7299; }
 .deck-done { color: #12805d; }
-.deck-title {margin-top: 12px;  font-weight: 600;   font-size: 17px; color: #29465f; }
-.deck-desc {margin-top: 7px; font-size: 13px; line-height: 20px;   color: #62788b; }
+.deck-title { margin-top: 12px; font-weight: 700; font-size: 17px; color: #233f73; }
+.deck-desc { margin-top: 7px; font-size: 13px; line-height: 20px; color: #536c95; }
 .deck-action { position: absolute; left: 20px; bottom: 12px; }
-.deck-link { font-size: 14px; color: #1e63b4; font-weight: 400; }
+.deck-link { font-size: 14px; color: #4177d1; font-weight: 400; }
 </style>

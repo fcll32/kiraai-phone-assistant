@@ -14,6 +14,10 @@ def synchronize(write=False):
     release = json.loads((ROOT / "release.json").read_text(encoding="utf-8"))
     if not re.fullmatch(r"\d+\.\d+\.\d+", release["version"]):
         raise ValueError("Expected a numeric major.minor.patch version")
+    if type(release["version_code"]) is not int or not 1 <= release["version_code"] <= 2100000000:
+        raise ValueError("Expected a positive Android internal version code")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", release["repository"]):
+        raise ValueError("Expected a GitHub owner/repository update source")
     manifest_path = ROOT / "phone_control/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest.update(version=release["version"], display_name=release["name_en"], core_version=release["core_version"])
@@ -22,11 +26,14 @@ def synchronize(write=False):
     gradle = gradle_path.read_text(encoding="utf-8")
     gradle = re.sub(r"versionCode \d+", f'versionCode {release["version_code"]}', gradle)
     gradle = re.sub(r"versionName '[^']+'", f'versionName \'{release["version"]}\'', gradle)
+    manifest_text = json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
     targets = {
-        manifest_path: json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        manifest_path: manifest_text,
+        ROOT / "manifest.json": manifest_text,
         gradle_path: gradle,
         ROOT / "android-app/app/src/main/res/values/release.xml":
             '<resources>\n    <string name="app_name">' + escape(release["name"]) + '</string>\n'
+            '    <string name="update_repository" translatable="false">' + escape(release["repository"]) + '</string>\n'
             f'    <integer name="protocol_version">{release["protocol"]}</integer>\n</resources>\n',
     }
     uni_path = ROOT / "uni-app/manifest.json"
@@ -35,6 +42,9 @@ def synchronize(write=False):
         raise ValueError("uni-app application ID must preserve upgrade compatibility")
     uni.update(name=release["name"], versionName=release["version"], versionCode=str(release["version_code"]))
     targets[uni_path] = json.dumps(uni, ensure_ascii=False, indent=2) + "\n"
+    preview_path = ROOT / "uni-app/lib/phone.js"
+    preview = preview_path.read_text(encoding="utf-8")
+    targets[preview_path] = re.sub(r"version: '\d+\.\d+\.\d+'", f"version: '{release['version']}'", preview)
     bridge_path = ROOT / "uni-app/uni_modules/kira-phone/package.json"
     bridge = json.loads(bridge_path.read_text(encoding="utf-8"))
     bridge["version"] = release["version"]

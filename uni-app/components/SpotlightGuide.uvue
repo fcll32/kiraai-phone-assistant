@@ -1,0 +1,69 @@
+<template>
+  <view class="spotlight" @touchstart.stop @touchmove.stop.prevent @touchend.stop>
+    <view class="spot-shade" :style="topShade" /><view class="spot-shade" :style="bottomShade" />
+    <view class="spot-shade" :style="leftShade" /><view class="spot-shade" :style="rightShade" />
+    <view class="spot-frame" :style="frameStyle" />
+    <text class="spot-skip" :style="{ top: (inset + 12) + 'px' }" role="button" @click="emit('close')">跳过引导</text>
+    <view class="spot-bubble" :style="bubbleStyle">
+      <view class="spot-arrow" :style="arrowStyle" />
+      <text class="spot-count">{{ index + 1 }} / {{ steps.length }}</text>
+      <text class="spot-title">{{ steps[index].title }}</text>
+      <text class="spot-copy">{{ steps[index].body }}</text>
+      <view class="spot-next" role="button" :aria-disabled="busy" @click="next"><text class="spot-next-text">{{ index === steps.length - 1 ? '知道了' : '下一步 →' }}</text></view>
+    </view>
+  </view>
+</template>
+<script setup>
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { spotlightBounds } from '@/lib/motion.js'
+import { createTimeoutScope } from '@/lib/timers.js'
+const props = defineProps({ rect: { type: Object, default: () => ({ left: 20, top: 60, width: 48, height: 48 }) }, index: { type: Number, default: 0 }, busy: { type: Boolean, default: false }, duration: { type: Number, default: 400 }, active: { type: Boolean, default: true }, inset: { type: Number, default: 24 } })
+const emit = defineEmits(['next', 'close'])
+const window = uni.getWindowInfo(), width = window.windowWidth, height = window.windowHeight
+const pulse = ref(false)
+const entered = ref(false), timers = createTimeoutScope()
+let breath = null
+const steps = [
+  { title: '先准备连接信息', body: '从菜单进入连接设置，复制服务器地址、密码和校验码。公网入口默认 5267。' },
+  { title: '你确认后才连接', body: '开启无障碍后，再点这里开始连接。系统会请你确认，随时可以停止。' },
+  { title: '认准这个连接状态', body: '显示“已连接”后，再让授权聊天里的 Kira 查看或操作手机。正在连接不代表认证成功。' }
+]
+const box = computed(() => spotlightBounds(props.rect, width, height))
+const ms = computed(() => props.active ? props.duration + 'ms' : '0ms')
+const topShade = computed(() => ({ left: '0px', top: '0px', width: width + 'px', height: box.value.top + 'px', transitionDuration: ms.value }))
+const bottomShade = computed(() => ({ left: '0px', top: (box.value.top + box.value.height) + 'px', width: width + 'px', height: Math.max(0, height - box.value.top - box.value.height) + 'px', transitionDuration: ms.value }))
+const leftShade = computed(() => ({ left: '0px', top: box.value.top + 'px', width: box.value.left + 'px', height: box.value.height + 'px', transitionDuration: ms.value }))
+const rightShade = computed(() => ({ left: (box.value.left + box.value.width) + 'px', top: box.value.top + 'px', width: Math.max(0, width - box.value.left - box.value.width) + 'px', height: box.value.height + 'px', transitionDuration: ms.value }))
+const frameStyle = computed(() => ({ left: box.value.left + 'px', top: box.value.top + 'px', width: box.value.width + 'px', height: box.value.height + 'px', borderRadius: '22px', opacity: pulse.value ? 1 : .65, transitionDuration: ms.value }))
+const bubbleWidth = Math.min(324, width - 40)
+const above = computed(() => box.value.top > height * .5)
+const bubbleX = computed(() => Math.max(20, Math.min(width - bubbleWidth - 20, box.value.left + box.value.width / 2 - bubbleWidth / 2)))
+const bubbleY = computed(() => Math.max(props.inset + 56, Math.min(height - 210, above.value ? box.value.top - 194 : box.value.top + box.value.height + 20)))
+const bubbleStyle = computed(() => ({ left: bubbleX.value + 'px', top: bubbleY.value + 'px', width: bubbleWidth + 'px', opacity: entered.value ? 1 : 0, transform: entered.value ? 'scale(1)' : 'scale(0.88)', transitionDuration: ms.value }))
+const arrowStyle = computed(() => ({ left: Math.max(20, Math.min(bubbleWidth - 32, box.value.left + box.value.width / 2 - bubbleX.value - 6)) + 'px', top: above.value ? 'auto' : '-6px', bottom: above.value ? '-6px' : 'auto' }))
+function next() { if (!props.busy && props.active) emit('next', props.index) }
+function breathing() {
+  if (breath != null) clearInterval(breath)
+  breath = null; pulse.value = false
+  if (props.active && props.duration > 0) breath = setInterval(() => { pulse.value = !pulse.value }, Math.max(650, props.duration * 2.2))
+}
+watch(() => [props.active, props.duration], breathing, { immediate: true })
+watch(() => [props.active, props.duration], () => {
+  timers.clear(); entered.value = props.active && props.duration === 0
+  if (props.active && props.duration > 0) timers.after(() => { entered.value = true }, 16)
+}, { immediate: true })
+onUnmounted(() => { timers.dispose(); if (breath != null) clearInterval(breath) })
+</script>
+<style>
+.spotlight { position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 91; }
+.spot-shade { position: absolute; background-color: rgba(9,22,33,0.7); transition-property: left,top,width,height; transition-timing-function: cubic-bezier(0.22,1,0.36,1); }
+.spot-frame { position: absolute; border: 2px solid #e1f0fc; pointer-events: none; transition-property: left,top,width,height,opacity; transition-timing-function: cubic-bezier(0.22,1,0.36,1); }
+.spot-skip { position: absolute; right: 22px; padding: 10px; color: #edf5fa; font-size: 13px; }
+.spot-bubble { position: absolute; background-color: #eff6ff; border-radius: 24px; padding: 20px; transition-property: left,top,transform,opacity; transition-timing-function: cubic-bezier(0.22,1.18,0.36,1); border: 1px solid rgba(255,255,255,0.85); }
+.spot-arrow { position: absolute; width: 12px; height: 12px; background-color: #eff6ff; transform: rotate(45deg); }
+.spot-count { color: #7b91a1; font-size: 11px; margin-bottom: 7px; }
+.spot-title { color: #264a82; font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+.spot-copy { color: #526b93; font-size: 13px; line-height: 21px; }
+.spot-next { align-self: flex-end; margin-top: 17px; padding: 9px 17px; border-radius: 20px; background-color: #5585df; }
+.spot-next-text { color: #ffffff; font-size: 13px; }
+</style>

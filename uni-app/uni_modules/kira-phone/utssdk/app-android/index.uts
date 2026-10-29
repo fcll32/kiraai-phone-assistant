@@ -1,8 +1,17 @@
 import { PhoneRuntime } from 'top.kira.phone'
+import { UpdateRuntime } from 'top.kira.phone'
 import { VoiceRuntime, VirtualMicRuntime } from 'top.kira.phone'
 import { UTSAndroid } from 'io.dcloud.uts'
 
 export function readState(): string { return PhoneRuntime.state(UTSAndroid.getAppContext()!) }
+export function readUpdateState(): string { return UpdateRuntime.state(UTSAndroid.getAppContext()!) }
+export function checkUpdate(): void { UpdateRuntime.check(UTSAndroid.getAppContext()!) }
+export function checkUpdateQuietly(): void { UpdateRuntime.checkQuietly(UTSAndroid.getAppContext()!) }
+export function projectUrl(): string { return UpdateRuntime.projectUrl(UTSAndroid.getAppContext()!) }
+export function openProject(): void { UpdateRuntime.openProject(UTSAndroid.getUniActivity()!) }
+export function downloadUpdate(): void { UpdateRuntime.download(UTSAndroid.getAppContext()!) }
+export function cancelUpdate(): void { UpdateRuntime.cancel(UTSAndroid.getAppContext()!) }
+export function installUpdate(): void { UpdateRuntime.install(UTSAndroid.getUniActivity()!) }
 export function readCallState(): string { return VoiceRuntime.state(UTSAndroid.getAppContext()!) }
 export function requestMicrophone(): void { VoiceRuntime.requestMicrophone(UTSAndroid.getUniActivity()!) }
 export function startCall(): void { VoiceRuntime.start(UTSAndroid.getUniActivity()!) }

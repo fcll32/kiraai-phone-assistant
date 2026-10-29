@@ -5,8 +5,8 @@
   }],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "给 AI 一台手机",
-    "navigationBarBackgroundColor": "#e9eef2",
-    "backgroundColor": "#e9eef2"
+    "navigationBarTitleText": "KiraAI 手机助手",
+    "navigationBarBackgroundColor": "#d9e9ff",
+    "backgroundColor": "#d9e9ff"
   }
 }

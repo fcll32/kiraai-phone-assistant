@@ -27,15 +27,39 @@
       }
     }
   },
-  "phone_port": {
-    "name": "Phone connection port",
-    "type": "integer",
-    "default": 8443,
-    "hint": "The server port used by this plugin, usually 8443; not KiraAI's management web port. The phone address is the public IP above followed by : and this port. Allow it in the server firewall and map the same port in Docker.",
+  "shared_entry": {
+    "name": "Shared HTTPS entry",
+    "type": "boolean",
+    "default": true,
+    "hint": "Serve Kira WebUI and phone WSS through one public TLS entry. Docker maps public 5267 to the internal TLS port (8443).",
     "locales": {
       "zh": {
-        "name": "手机连接端口",
-        "hint": "这是插件在服务器上接收手机连接的端口，通常保持 8443，不是 KiraAI 管理网页的端口。手机地址填“上面的公网 IP:这个端口”。服务器安全组需放行；Docker 安装还需映射同一端口。"
+        "name": "管理网页和手机共用入口",
+        "hint": "推荐开启。公网只用 5267，管理网页通过 HTTPS，手机通过 WSS。Docker 需将公网 5267 映射到容器内的加密入口 8443；原管理端口仅保留本机备用访问。"
+      }
+    }
+  },
+  "public_port": {
+    "name": "Public entry port",
+    "type": "integer",
+    "default": 5267,
+    "hint": "Public port used by both the browser and phone when the shared entry is enabled.",
+    "locales": {
+      "zh": {
+        "name": "公网入口端口",
+        "hint": "共用入口时保持 5267。手机填 公网IP:5267，浏览器打开 https://公网IP:5267。容器内部端口另行配置。"
+      }
+    }
+  },
+  "phone_port": {
+    "name": "Internal TLS port (advanced)",
+    "type": "integer",
+    "default": 8443,
+    "hint": "Internal TLS listener, normally 8443. In Docker map public 5267 to this port; it must differ from the local Kira HTTP port. Used directly in legacy separate-port mode.",
+    "locales": {
+      "zh": {
+        "name": "加密入口内部端口（高级）",
+        "hint": "通常保持 8443。共用入口时 Docker 映射 公网5267→容器8443，避免与容器内 Kira 的 HTTP 5267 冲突。关闭共用入口时，此值仍是手机直连端口。"
       }
     }
   },
@@ -248,6 +272,18 @@
       "zh": {
         "name": "手机服务启动状态",
         "hint": "首次请到“手机连接”页点启动。启动后重启自动恢复；手动停止后不再恢复。只保存 IP 和端口不会首次启动。"
+      }
+    }
+  },
+  "shared_entry_started": {
+    "name": "Shared entry initialized",
+    "type": "boolean",
+    "default": false,
+    "hint": "Maintained automatically after the first manual start. Keeps WebUI access available after phone control is stopped.",
+    "locales": {
+      "zh": {
+        "name": "共享入口已初始化（自动维护）",
+        "hint": "第一次手动启动后自动记录；手机停止时保留管理网页访问。一般无需修改。"
       }
     }
   }

@@ -24,7 +24,7 @@ import { createTimeoutScope } from '@/lib/timers.js'
 const props = defineProps({ duration: { type: Number, default: 400 }, animated: { type: Boolean, default: true }, speed: { type: Number, default: 1 }, active: { type: Boolean, default: true }, configured: { type: Boolean, default: false }, accessibility: { type: Boolean, default: false }, connected: { type: Boolean, default: false } })
 const emit = defineEmits(['action', 'close'])
 const steps = [
-  { tag: '01 · 服务器', title: '先让服务器等你', body: '在 KiraAI 的“手机连接”页，填公网 IP、端口和允许的聊天，点击“保存并启动”。以后重启会自动恢复。', note: 'Docker 默认映射 8443 → 8443，不是管理网页的 5267。' },
+  { tag: '01 · 服务器', title: '先让服务器等你', body: '在 KiraAI 的“手机连接”页，填公网 IP、端口和允许的聊天，点击“保存并启动”。以后重启会自动恢复。', note: '共用入口时，Docker 映射公网 5267 → 容器 8443，管理网页使用 HTTPS。' },
   { tag: '02 · 连接信息', title: '三项内容，一次填好', body: '复制服务器地址、连接密码和校验码，填入本 App 的连接设置并保存。', note: '地址只需 IP:端口。密码可自定义；校验码请完整复制，无需记住。' },
   { tag: '03 · 手机权限', title: '让手机可以操作', body: '打开系统无障碍设置，找到 KiraAI 手机助手并开启服务，然后返回这里。', note: 'Android 11+ 可以截图；8–10 可读取界面文字和控制，不持续录屏。' },
   { tag: '04 · 开始使用', title: '接下来，用对话操作', body: '回首页点“开始连接”，确认后等待“已连接”。再到允许的聊天说：“看看手机屏幕，并把截图发给我。”', note: '你可以随时在 App 或通知中停止。通话在“通话”页单独开启。' }
@@ -56,12 +56,12 @@ onUnmounted(() => timeouts.dispose())
 .guide { flex: 1; }
 .guide-track { flex-direction: row; align-items: center; margin-bottom: 14px; }
 .guide-dot { height: 8px; margin-right: 7px; border-radius: 6px; transition-property: width, background-color; }
-.guide-count { margin-left: auto; font-size: 12px; color: #718397; }
-.guide-card { background-color: #eef3f7; border-radius: 20px; padding: 20px; margin-bottom: 18px; transition-property: transform, opacity; transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+.guide-count { margin-left: auto; font-size: 12px; color: #304d66; }
+.guide-card { background-color: #e5efff; border-radius: 24px; padding: 20px; margin-bottom: 18px; transition-property: transform, opacity; transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1); border: 1px solid rgba(255,255,255,0.7); }
 .guide-kicker { color: #527796; font-size: 12px; margin-bottom: 10px; }
-.guide-title { color: #18354d; font-size: 22px; font-weight: 600; margin-bottom: 12px; }
-.guide-copy { color: #40576b; font-size: 15px; line-height: 24px; }
-.guide-note { color: #718397; font-size: 12px; line-height: 19px; margin-top: 14px; }
+.guide-title { color: #284b83; font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+.guide-copy { color: #49648c; font-size: 15px; line-height: 24px; }
+.guide-note { color: #52687c; font-size: 12px; line-height: 19px; margin-top: 14px; }
 .guide-links { flex-direction: row; justify-content: space-between; padding: 18px 4px 10px; }
-.guide-link { font-size: 14px; color: #527796; padding: 6px; }
+.guide-link { font-size: 14px; color: #284a67; padding: 6px; }
 </style>

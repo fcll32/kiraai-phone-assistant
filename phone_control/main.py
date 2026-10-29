@@ -119,10 +119,10 @@ class PhoneControlPlugin(BasePlugin):
                 if not valid_password(token):
                     raise PhoneError("连接密码请用 8–128 位英文字母、数字或符号，不含空格")
                 self.transport.config = dict(self.plugin_cfg, device_token=token)
-                if (self.plugin_cfg.get("builtin_server", True) and self.plugin_cfg.get("listener_enabled", False)
+                if (self.plugin_cfg.get("builtin_server", True) and (self.plugin_cfg.get("listener_enabled", False)
+                        or (self.plugin_cfg.get("shared_entry", False) and self.plugin_cfg.get("shared_entry_started", False)))
                         and self.plugin_cfg.get("public_ip", "")):
-                    self.phone_server = PhoneServer(self.transport, directory, voice=self.voice)
-                    await self.phone_server.start(self.plugin_cfg["public_ip"], self.plugin_cfg.get("phone_port", 8443), identity)
+                    await self._start_phone_server(directory, identity)
             except Exception as exc:
                 if isinstance(exc, PhoneError):
                     self.setup_error = str(exc)
@@ -135,8 +135,42 @@ class PhoneControlPlugin(BasePlugin):
                 logger.warning("[phone_control] Built-in server not ready (%s)", type(exc).__name__)
         logger.info("[phone_control] Loaded; phone access requires an allowed session")
 
+    async def _start_phone_server(self, directory, identity):
+        host, port = validate_settings(self.plugin_cfg["public_ip"], self.plugin_cfg.get("phone_port", 8443))
+        shared = self.plugin_cfg.get("shared_entry", False) is True
+        manager = self.ctx.plugin_mgr
+        previous = getattr(manager, "_phone_control_entry", None)
+        if shared:
+            app = getattr(manager, "_web_app", None)
+            if app is None or getattr(app.state, "disable_auth", False):
+                raise PhoneError("共用入口需要启用 Kira 管理网页的登录验证")
+            if previous and previous.runner:
+                if (previous.host, previous.port) != (host, port):
+                    raise PhoneError("共享入口的 IP 或内部端口改变后，需要重启 Kira 才能生效")
+                previous.bridge, previous.voice = self.transport, self.voice
+                previous.accept_connections = self.plugin_cfg.get("listener_enabled", False) is True
+                self.phone_server = previous
+                return
+            from core.utils.path_utils import get_data_path
+            config_path = get_data_path() / "webui.json"
+            webui = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+            webui_port = webui.get("port", 5267)
+        else:
+            webui_port = None
+        server = PhoneServer(self.transport, directory, voice=self.voice)
+        await server.start(host, port, identity, webui_port=webui_port)
+        server.accept_connections = self.plugin_cfg.get("listener_enabled", False) is True
+        self.phone_server = server
+        if shared:
+            # This entry outlives phone-plugin reload/stop so its own management
+            # page can still start the phone service again. Kira shutdown owns it.
+            manager._phone_control_entry = server
+            app.router.add_event_handler("shutdown", server.close)
+
     async def terminate(self):
         self._closed = True
+        if self.phone_server:
+            self.phone_server.accept_connections = False
         try:
             try:
                 await self.voice.close()
@@ -144,7 +178,7 @@ class PhoneControlPlugin(BasePlugin):
                 await self.transport.close()
         finally:
             try:
-                if self.phone_server:
+                if self.phone_server and self.phone_server is not getattr(self.ctx.plugin_mgr, "_phone_control_entry", None):
                     await self.phone_server.close()
             finally:
                 self._frames.clear()
@@ -157,11 +191,13 @@ class PhoneControlPlugin(BasePlugin):
     @register.api("GET", "/setup", auth=True)
     async def connection_info(self):
         server = self.phone_server
-        ready = bool(server and server.runner and not self._closed)
+        ready = bool(server and server.runner and server.accept_connections and not self._closed)
         data = {
             "ready": ready, "error": self.setup_error,
             "public_ip": self.plugin_cfg.get("public_ip", ""),
-            "port": self.plugin_cfg.get("phone_port", 8443),
+            "port": self.plugin_cfg.get("public_port", 5267) if self.plugin_cfg.get("shared_entry", False) else self.plugin_cfg.get("phone_port", 8443),
+            "listen_port": self.plugin_cfg.get("phone_port", 8443),
+            "shared_entry": self.plugin_cfg.get("shared_entry", False) is True,
             "allowed_sessions": self.plugin_cfg.get("allowed_sessions", []),
             "voice_enabled": self.plugin_cfg.get("voice_enabled", False) is True,
             "connected": isinstance(self.transport, AppBridge) and bool(self.transport.socket),
@@ -170,7 +206,8 @@ class PhoneControlPlugin(BasePlugin):
             "apk_available": (Path(__file__).parent / "app/GiveAIAPhone.apk").is_file(),
         }
         if ready:
-            data.update(address=server.address, password=self.transport.config["device_token"],
+            host = f"[{server.host}]" if ":" in server.host else server.host
+            data.update(address=f"{host}:{data['port']}", password=self.transport.config["device_token"],
                         fingerprint=server.fingerprint, expires=server.expires)
         return JSONResponse(data, headers={"Cache-Control": "no-store"})
 
@@ -190,6 +227,8 @@ class PhoneControlPlugin(BasePlugin):
                 changes = self._connection_changes(payload)
                 if action == "start":
                     changes["listener_enabled"] = True
+                    if changes.get("shared_entry"):
+                        changes["shared_entry_started"] = True
         except PhoneError as exc:
             raise HTTPException(400, str(exc)) from None
         manager = self.ctx.plugin_mgr
@@ -202,7 +241,15 @@ class PhoneControlPlugin(BasePlugin):
         return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
 
     def _connection_changes(self, payload):
-        host, port = validate_settings(payload.get("public_ip"), payload.get("port", 8443))
+        shared = payload.get("shared_entry", self.plugin_cfg.get("shared_entry", False))
+        if type(shared) is not bool:
+            raise PhoneError("共用入口开关必须为开启或关闭")
+        host, port = validate_settings(payload.get("public_ip"), payload.get("port", 5267 if shared else 8443))
+        listen_port = payload.get("listen_port", self.plugin_cfg.get("phone_port", 8443)) if shared else port
+        validate_settings(host, listen_port)
+        previous = getattr(self.ctx.plugin_mgr, "_phone_control_entry", None)
+        if previous and previous.runner and (not shared or (previous.host, previous.port) != (host, listen_port)):
+            raise PhoneError("共享入口运行中，请保持共用模式、IP 和内部端口；需要更换时先修改插件配置，再重启 Kira")
         sessions = payload.get("allowed_sessions", [])
         if (not isinstance(sessions, list) or len(sessions) > 100
                 or any(not isinstance(sid, str) or not sid.strip() or len(sid) > 512 for sid in sessions)):
@@ -213,7 +260,8 @@ class PhoneControlPlugin(BasePlugin):
             raise PhoneError("App 内通话开关必须为开启或关闭")
         changes = {
             "transport": "app", "builtin_server": True, "public_ip": host,
-            "phone_port": port, "allowed_sessions": sessions, "voice_enabled": voice_enabled,
+            "phone_port": listen_port, "public_port": port, "shared_entry": shared,
+            "allowed_sessions": sessions, "voice_enabled": voice_enabled,
         }
         password = payload.get("password", "")
         if password != "":
@@ -240,7 +288,7 @@ class PhoneControlPlugin(BasePlugin):
 
     def _accepting_connections(self):
         return not self._closed and (not self.plugin_cfg.get("builtin_server", True)
-                                    or bool(self.phone_server and self.phone_server.runner))
+                                    or bool(self.phone_server and self.phone_server.runner and self.phone_server.accept_connections))
 
     def _authorize(self, event: KiraMessageBatchEvent):
         if self._closed:
@@ -312,6 +360,7 @@ class PhoneControlPlugin(BasePlugin):
             total -= len(removed.screen.png)
 
     async def _send(self, event, element) -> dict:
+        self._authorize(event)
         if getattr(event, "_phone_voice_owner", None) is self.voice:
             return await self.voice.send_text(event, element)
         kind = element.type.value
@@ -339,8 +388,12 @@ class PhoneControlPlugin(BasePlugin):
             await ws.close(code=1008, reason="Phone listener is stopped")
 
     async def _observe(self, event, serial: str, send_to_chat: bool = False, *, ui_only=False) -> ToolResult:
+        self._authorize(event)
         started = monotonic()
         screen = await self.transport.screenshot(serial, ui_only=True) if ui_only else await self.transport.screenshot(serial)
+        # Capture/decode can complete after stop or voice interruption. Do not
+        # restore cleared frames or deliver the late image using old permission.
+        self._authorize(event)
         captured = monotonic()
         screenshot_id = uuid4().hex
         frame = Snapshot(event.sid, serial, self._generation, monotonic(), screen)
@@ -376,6 +429,7 @@ class PhoneControlPlugin(BasePlugin):
         refs = []
         try:
             capabilities = await self.ctx.get_session_capabilities(event.sid)
+            self._authorize(event)
             recognition = capabilities.get("image_recognition", {})
             if not recognition.get("enabled", True):
                 info["vision_error"] = "当前会话已关闭图片识别；AI 未收到画面，不能据此定位"
@@ -614,11 +668,12 @@ class PhoneControlPlugin(BasePlugin):
                 raise PhoneError("action 必须是字符串，observe_after 必须为布尔值")
             if not isinstance(observe_mode, str) or observe_mode not in {"auto", "ui", "screenshot"}:
                 raise PhoneError("observe_mode 必须为 auto/ui/screenshot")
-            supports_ui = isinstance(self.transport, AppBridge) and "ui_tree" in self.transport.capabilities
-            if observe_after and observe_mode == "ui" and not supports_ui:
-                raise PhoneError("当前连接不支持 UI 观察，请升级手机 App 或使用 screenshot 模式")
             validate_action(action, params)
             async with self._device_lock(event):
+                # The peer/capabilities may change while waiting for another tool.
+                supports_ui = isinstance(self.transport, AppBridge) and "ui_tree" in self.transport.capabilities
+                if observe_after and observe_mode == "ui" and not supports_ui:
+                    raise PhoneError("当前连接不支持 UI 观察，请升级手机 App 或使用 screenshot 模式")
                 serial = await self.transport.select_device()
                 previous = next((item for item in reversed(self._frames.values())
                                  if item.sid == event.sid and item.serial == serial), None)

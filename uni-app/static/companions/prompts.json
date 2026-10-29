@@ -1,0 +1,32 @@
+[
+  {
+    "asset": "about.png",
+    "engine": "built-in imagegen",
+    "prompt": "ONE transparent square chibi reaction sticker for a blue Android app. Image 1 is the original character; image 2 is the exact chibi drawing reference. Preserve the same periwinkle-blue flowing hair and long side fringe, bright cyan-blue eyes, pale skin, cozy white-and-blue scarf and hoodie, clean anime linework, icy lavender highlights, large head and tiny hands. Full head, gesture and hands inside frame with transparent padding. Genuinely transparent alpha, subtle white sticker outline. NO text, watermark, background, panel, collage. Face expression and hand pose must be distinct and immediately legible at 48 px. Expression/action: a playful WINK and delighted grin; head tilted slightly, showing a rounded pale blue gear charm with one hand, the other hand raised in a small friendly flourish."
+  },
+  {
+    "asset": "guide.png",
+    "engine": "built-in imagegen",
+    "prompt": "ONE transparent square chibi reaction sticker for a blue Android app. Image 1 is the original character; image 2 is the exact chibi drawing reference. Preserve the same periwinkle-blue flowing hair and long side fringe, bright cyan-blue eyes, pale skin, cozy white-and-blue scarf and hoodie, clean anime linework, icy lavender highlights, large head and tiny hands. Full head, gesture and hands inside frame with transparent padding. Genuinely transparent alpha, subtle white sticker outline. NO text, watermark, background, panel, collage. Face expression and hand pose must be distinct and immediately legible at 48 px. Expression/action: inquisitive thinking face, one eyebrow gently raised, small thoughtful closed mouth; holding an OPEN blue guidebook and pointing at a page with one small finger. Helpful curiosity, not smiling open-mouthed."
+  },
+  {
+    "asset": "rest.png",
+    "engine": "built-in imagegen",
+    "prompt": "ONE transparent square chibi reaction sticker for a blue Android app. Image 1 is the original character; image 2 is the exact chibi drawing reference. Preserve the same periwinkle-blue flowing hair and long side fringe, bright cyan-blue eyes, pale skin, cozy white-and-blue scarf and hoodie, clean anime linework, icy lavender highlights, large head and tiny hands. Full head, gesture and hands inside frame with transparent padding. Genuinely transparent alpha, subtle white sticker outline. NO text, watermark, background, panel, collage. Face expression and hand pose must be distinct and immediately legible at 48 px. Expression/action: visibly RESTING, both eyes peacefully closed, relaxed tiny smile, cheek resting on sleeve and small hands tucked into the scarf. No tired Z letters. Calm off-state, no props."
+  },
+  {
+    "asset": "shield.png",
+    "engine": "built-in imagegen",
+    "prompt": "ONE transparent square chibi reaction sticker for a blue Android app. Image 1 is the original character; image 2 is the exact chibi drawing reference. Preserve the same periwinkle-blue flowing hair and long side fringe, bright cyan-blue eyes, pale skin, cozy white-and-blue scarf and hoodie, clean anime linework, icy lavender highlights, large head and tiny hands. Full head, gesture and hands inside frame with transparent padding. Genuinely transparent alpha, subtle white sticker outline. NO text, watermark, background, panel, collage. Face expression and hand pose must be distinct and immediately legible at 48 px. Expression/action: brave DETERMINED closed-mouth expression, focused eyebrows and confident blue eyes; hugging a small blue SHIELD protectively with both hands. One simple white check on shield."
+  },
+  {
+    "asset": "device.png",
+    "engine": "built-in imagegen",
+    "prompt": "Use case: stylized-concept. Asset: ONE small transparent chibi reaction sticker for an Android app's side drawer. Use the attached image only as character/color reference: periwinkle blue hair with a long side-swept fringe, large bright cyan-blue eyes, soft pale skin, cozy white and pale-blue scarf/hoodie. Cute super-deformed anime bust, large head and little hands, clean expressive linework, icy blue and lavender palette, subtle white sticker outline, legible at 96 px. Center the entire character with comfortable transparent padding, isolated on genuinely transparent alpha. No panels, no background, no words, no watermark, no grid. Pose: cheerful and curious, holding a tiny pale blue smartphone near the chest, screen facing viewer, both eyes open."
+  },
+  {
+    "asset": "link.png",
+    "engine": "built-in imagegen",
+    "prompt": "Use case: stylized-concept. Asset: ONE small transparent chibi reaction sticker for an Android app's side drawer. Use the attached image only as character/color reference: periwinkle blue hair with a long side-swept fringe, large bright cyan-blue eyes, soft pale skin, cozy white and pale-blue scarf/hoodie. Cute super-deformed anime bust, large head and little hands, clean expressive linework, icy blue and lavender palette, subtle white sticker outline, legible at 96 px. Center the entire character with comfortable transparent padding, isolated on genuinely transparent alpha. No panels, no background, no words, no watermark, no grid. Pose: focused but friendly, holding two halves of a little blue connector cable about to plug together, clear simple silhouette."
+  }
+]

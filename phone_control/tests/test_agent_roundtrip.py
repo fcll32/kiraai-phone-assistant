@@ -36,7 +36,7 @@ async def test_installed_zip_phone_tls_agent_and_provider_context(tmp_path, monk
     api_client = None
     requests, commands, sent_images = [], [], []
     try:
-        await manager.update_plugin_config(plugin_id, {"transport": "app", "builtin_server": True,
+        await manager.update_plugin_config(plugin_id, {"transport": "app", "builtin_server": True, "shared_entry": False,
             "public_ip": "127.0.0.1", "phone_port": unused_port(), "listener_enabled": True,
             "allowed_sessions": ["test:dm:owner"], "action_delay": 0})
         plugin = manager.plugin_instances[plugin_id]

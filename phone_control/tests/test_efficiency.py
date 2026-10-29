@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from time import monotonic
 from unittest.mock import AsyncMock
@@ -98,3 +99,35 @@ async def test_apps_refresh_flag_is_forwarded_and_capability_checked():
     assert bridge.request.call_args.args[2]['refresh'] is True
     bridge.capabilities.remove('apps_refresh')
     with pytest.raises(PhoneError):await bridge.apps('phone','',0,50,True)
+
+
+@pytest.mark.asyncio
+async def test_ui_capability_rechecked_after_waiting_for_device_lock(plugin):
+    bridge, _ = app_bridge()
+    plugin.transport = bridge
+    await plugin._lock.acquire()
+    action = asyncio.create_task(plugin.phone_navigate(make_event(), 'home', observe_mode='ui'))
+    try:
+        await asyncio.sleep(0)
+        # A peer reconnects without UI support while this tool is queued.
+        bridge.capabilities.clear()
+    finally:
+        plugin._lock.release()
+    data = unpack(await action)
+    assert not data['ok'] and not data['action_may_have_run']
+    bridge.action.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_local_wait_still_observes_and_invalidates_previous_target(plugin):
+    bridge, _ = app_bridge()
+    bridge.action = AppBridge.action.__get__(bridge)
+    plugin.transport = bridge
+    event = make_event()
+    previous = unpack(await plugin.phone_ui(event))['screenshot_id']
+    waited = unpack(await plugin.phone_action(event, 'wait', {'seconds': 0}))
+    assert waited['ok'] and waited['action_completed'] and not waited['screenshot_available']
+    assert [c.args[1] for c in bridge.request.await_args_list] == ['ui_tree', 'ui_tree']
+    stale = unpack(await plugin.phone_tap(event, 500, 300, previous, False))
+    assert not stale['ok'] and not stale['action_may_have_run']
+    assert len(bridge.request.await_args_list) == 2

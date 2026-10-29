@@ -6,7 +6,7 @@ import shutil
 ROOT = Path(__file__).resolve().parent.parent
 JAVA = ROOT / "android-app/app/src/main/java/top/kira/phone"
 MODULE = ROOT / "uni-app/uni_modules/kira-phone/utssdk/app-android"
-CLASSES = ("AppCatalog", "ConnectionPassword", "CommandGate", "ConnectionFailure", "ConnectionService", "PhoneAccessibility", "ServerAddress", "PhoneRuntime",
+CLASSES = ("AppCatalog", "UpdatePolicy", "UpdateRuntime", "ConnectionPassword", "CommandGate", "ConnectionFailure", "ConnectionService", "PhoneAccessibility", "ServerAddress", "PhoneRuntime",
            "SocketSecurity", "VoiceRuntime", "VoiceCallService", "VoiceVad",
            "VirtualMicRuntime", "VirtualMicService", "VirtualMicSignal")
 
@@ -15,6 +15,7 @@ def synchronize(write=False):
     pairs = [(JAVA / (name + ".java"), MODULE / (name + ".java")) for name in CLASSES]
     pairs += [(path, MODULE / "assets/licenses" / path.name)
               for path in (ROOT / "third-party").glob("*-LICENSE.txt")]
+    pairs.append((ROOT / "android-app/app/src/main/res/xml/kira_update_paths.xml", MODULE / "res/xml/kira_update_paths.xml"))
     stale = []
     for source, target in pairs:
         if not target.exists() or source.read_bytes() != target.read_bytes():

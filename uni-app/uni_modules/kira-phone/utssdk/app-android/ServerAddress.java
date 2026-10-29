@@ -10,7 +10,7 @@ public final class ServerAddress {
 
     public static String normalize(String input) {
         String value = input == null ? "" : input.trim();
-        if (value.isEmpty()) throw new IllegalArgumentException("请填写服务器 IP 和端口，例如 203.0.113.10:8443");
+        if (value.isEmpty()) throw new IllegalArgumentException("请填写服务器 IP 和端口，例如 203.0.113.10:5267");
         if (value.length() > 2048) throw new IllegalArgumentException("服务器地址太长，请检查是否粘贴了其他内容");
         boolean full = value.contains("://");
         try {
@@ -21,12 +21,12 @@ public final class ServerAddress {
                 throw new IllegalArgumentException("地址格式不正确，请只填写服务器 IP:端口");
             int port = uri.getPort();
             if ((!full && port == -1) || port == 0 || port > 65535 || uri.getRawAuthority().endsWith(":"))
-                throw new IllegalArgumentException("请填写有效端口，例如 203.0.113.10:8443");
+                throw new IllegalArgumentException("请填写有效端口，例如 203.0.113.10:5267");
             String path = uri.getRawPath();
             if (path == null || path.isEmpty() || path.equals("/")) path = DEVICE_PATH;
             return "wss://" + uri.getRawAuthority() + path;
         } catch (URISyntaxException error) {
-            throw new IllegalArgumentException("地址格式不正确，例如 203.0.113.10:8443；IPv6 请使用 [地址]:端口");
+            throw new IllegalArgumentException("地址格式不正确，例如 203.0.113.10:5267；IPv6 请使用 [地址]:端口");
         }
     }
 
