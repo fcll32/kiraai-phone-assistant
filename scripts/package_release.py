@@ -12,7 +12,7 @@ from sync_release import synchronize
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_DIRS = ("phone_control", "android-app", "uni-app", "deploy", "scripts", "third-party", ".github")
-ROOT_FILES = ("README.md", "新手使用说明.md", "RELEASE_NOTES.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", "manifest.json", "icon.png", "schema.json", "main.py", "requirements.txt")
+ROOT_FILES = ("README.md", "新手使用说明.md", "RELEASE_NOTES.md", "release.json", "THIRD_PARTY_NOTICES.md", ".gitignore", ".gitattributes", "manifest.json", "icon.png", "schema.json", "main.py", "requirements.txt")
 
 
 def source_files():
@@ -45,7 +45,8 @@ def package(apk=None, export=None):
                 destination = Path(export) / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, destination)
-    guide = output / "新手使用说明.md"
+    # GitHub release uploads sanitize non-ASCII filenames (e.g. to default.md).
+    guide = output / "QUICKSTART.zh-CN.md"
     shutil.copy2(ROOT / "新手使用说明.md", guide)
     artifacts = [plugin, source, guide]
     notes = ROOT / "RELEASE_NOTES.md"

@@ -41,4 +41,6 @@
 
 单独的 APK 方便直接安装；源码 ZIP 留给需要修改代码的人，普通用户不用下载。
 
+需要完整手机工程时，请下载 Release 中的 `kiraai-phone-assistant-1.0.1-source.zip`。GitHub 自动生成的仓库 ZIP 省去手机工程，供 KiraAI 在 50 MiB 限制内安装插件；仓库页面和独立源码包仍保留完整源码。
+
 [手机说明](uni-app/README.md) · [插件说明](phone_control/README.md)

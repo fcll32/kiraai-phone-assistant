@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import struct
+import subprocess
 import zipfile
 
 import pytest
@@ -138,6 +139,7 @@ def test_source_distribution_excludes_builds_and_secrets():
     files = source_files()
     assert ".github/workflows/build.yml" in files
     assert "release.json" in files
+    assert ".gitattributes" in files
     assert "manifest.json" in files
     assert "icon.png" in files
     assert "phone_control/icon.png" in files
@@ -160,9 +162,9 @@ def test_source_distribution_excludes_builds_and_secrets():
 
 def test_release_packages_standalone_chinese_guide_with_valid_checksums(tmp_path, monkeypatch):
     files = source_files()
-    guide_name = "新手使用说明.md"
-    guide_content = files[guide_name].read_bytes()
-    (tmp_path / guide_name).write_bytes(guide_content)
+    guide_name = "QUICKSTART.zh-CN.md"
+    guide_content = files["新手使用说明.md"].read_bytes()
+    (tmp_path / "新手使用说明.md").write_bytes(guide_content)
     notes = "# 发布说明\n测试版本的更新内容。\n".encode("utf-8")
     (tmp_path / "RELEASE_NOTES.md").write_bytes(notes)
     monkeypatch.setattr(package_release, "ROOT", tmp_path)
@@ -195,6 +197,22 @@ def test_release_keeps_apk_separate_from_installable_plugin(tmp_path, monkeypatc
     target = output / f"phone_control-{version}.zip"
     with zipfile.ZipFile(target) as archive:
         assert not any(i.filename.endswith(".apk") for i in archive.infolist())
+        assert sum(i.file_size for i in archive.infolist()) < 50 * 1024 * 1024
+    assert target.stat().st_size < 50 * 1024 * 1024
+
+
+def test_github_archive_fits_plugin_install_limit_without_phone_projects(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    target = tmp_path / "repository-plugin.zip"
+    # Use the working attributes while developing the rule; CI sees the same
+    # attributes committed at HEAD. This exercises Git's real archive behavior.
+    subprocess.run(["git", "archive", "--format=zip", "--worktree-attributes",
+                    "--output=" + str(target), "HEAD"], cwd=root, check=True)
+    with zipfile.ZipFile(target) as archive:
+        names = set(archive.namelist())
+        assert {"manifest.json", "main.py", "icon.png", "phone_control/main.py",
+                "phone_control/web/assets/plugin-avatar.png"}.issubset(names)
+        assert not any(name.startswith(("android-app/", "uni-app/")) for name in names)
         assert sum(i.file_size for i in archive.infolist()) < 50 * 1024 * 1024
     assert target.stat().st_size < 50 * 1024 * 1024
 

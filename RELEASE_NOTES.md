@@ -19,10 +19,12 @@ APK 和插件统一更新到 **1.0.1**，Android 内部版本码为 **2**。保�
 | KiraAI-Phone-Assistant-1.0.1.apk | 安装到 Android 手机 |
 | phone_control-1.0.1.zip | 在 KiraAI 的插件管理里安装，不用解压 |
 | kiraai-phone-assistant-1.0.1-source.zip | 完整源码，供开发和修改使用 |
-| 新手使用说明.md、README.txt | 安装和连接步骤 |
+| QUICKSTART.zh-CN.md、README.txt | 中文安装和连接步骤 |
 | SHA256SUMS.txt | 检查下载文件是否完整 |
 
 插件 ZIP 不含 APK，压缩包和解压后的总量均低于 Kira 的 50 MiB 限制。
+
+GitHub 自动生成的仓库 ZIP 用于安装插件，已省去手机工程以满足同一体积限制；需要完整 App 和插件源码时，请下载上面的独立 source.zip。仓库页面仍保留全部源码。
 
 ## 从旧版更新
 

@@ -3,3 +3,8 @@
 # (the Windows default) that would otherwise mark the whole tree stale.
 # Binaries are auto-detected and left untouched.
 * text=auto eol=lf
+
+# GitHub plugin installation downloads a repository archive with a 50 MiB limit.
+# Keep phone projects in Git and the explicit full-source release ZIP.
+/android-app export-ignore
+/uni-app export-ignore
